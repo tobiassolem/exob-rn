@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>EXOBÖRN</title>
+    <style>
+        body { background: #1a1a1a; color: #00ff41; font-family: 'Courier New', Courier, monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        #ui { width: 800px; display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 2px solid #00ff41; padding-bottom: 5px; }
+        canvas { border: 4px solid #333; background: #050505; box-shadow: 0 0 20px rgba(0, 255, 65, 0.2); cursor: crosshair; }
+        .controls { margin-top: 15px; font-size: 0.8em; color: #888; text-align: center; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div>BANK: $<span id="bank">0</span></div>
+        <div style="color: #fff; font-weight: bold;">EXOBÖRN</div>
+        <div>CURRENT: $<span id="current">0</span></div>
+    </div>
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <div id="msg" style="position: absolute; color: white; background: rgba(0,0,0,0.9); padding: 20px; display: none; text-align: center; border: 1px solid #00ff41;"></div>
+    <div class="controls">
+        SPACE: Jump | DOWN ARROW: Duck | CLICK PLATFORM: Grapple (SWING) <br>
+        E: Extraction ($5000+) | R: Deploy
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const bankEl = document.getElementById('bank');
+        const currentEl = document.getElementById('current');
+        const msgEl = document.getElementById('msg');
+
+        let bank = 0;
+        let wallet = 0;
+        let gameActive = true;
+        let animationFrameId;
+
+        const player = {
+            x: 100, y: 200, w: 30, h: 50,
+            vx: 0, vy: 0, 
+            normalGravity: 0.6,
+            jumpPower: -14,
+            airFriction: 0.99, 
+            groundFriction: 0.85,
+            currentGravity: 0.6,
+            isGrounded: false,
+            isDucking: false,
+            hook: { active: false, x: 0, y: 0, length: 0 }
+        };
+
+        let platforms = [];
+        let items = [];
+        let obstacles = [];
+        let baseSpeed = 4;
+        let scrollSpeed = baseSpeed;
+        let frameCount = 0;
+
+        function initLevel() {
+            platforms = [
+                { x: 0, y: 350, w: 1000, h: 50 },
+                { x: 1200, y: 350, w: 800, h: 50 }
+            ];
+            items = [];
+            obstacles = [];
+            player.x = 100;
+            player.y = 200;
+            player.vx = 0;
+            player.vy = 0;
+            player.currentGravity = player.normalGravity;
+            player.hook.active = false;
+            wallet = 0;
+            scrollSpeed = baseSpeed;
+            updateUI();
+            gameActive = true;
+            msgEl.style.display = "none";
+        }
+
+        function updateUI() {
+            currentEl.innerText = wallet;
+            bankEl.innerText = bank;
+            scrollSpeed = baseSpeed + (wallet / 1000);
+        }
+
+        function spawnEntities() {
+            frameCount++;
+            let spawnRate = Math.max(20, 60 - Math.floor(scrollSpeed)); 
+            
+            if (frameCount % spawnRate === 0) {
+                platforms.push({ x: 800, y: 350, w: 400 + Math.random() * 400, h: 50 });
+            }
+            if (frameCount % 80 === 0 && Math.random() > 0.3) {
+                platforms.push({ x: 800, y: 150 + Math.random() * 100, w: 150, h: 20 });
+            }
+            if (frameCount % 100 === 0) {
+                items.push({ x: 850, y: 100 + Math.random() * 150, w: 15, h: 15, val: 500 });
+            }
+            if (frameCount % 90 === 0 && Math.random() > 0.5) {
+                obstacles.push({ x: 850, y: 320, w: 30, h: 30 });
+            }
+        }
+
+        function update() {
+            if (!gameActive) return;
+
+            spawnEntities();
+
+            player.vy += player.currentGravity;
+
+            if (player.hook.active) {
+                const playerCenterX = player.x + player.w / 2;
+                const playerCenterY = player.y + player.h / 2;
+                const dx = playerCenterX - player.hook.x;
+                const dy = playerCenterY - player.hook.y;
+                const currentDist = Math.sqrt(dx * dx + dy * dy);
+
+                if (currentDist > 0 && currentDist > player.hook.length) {
+                    const normX = dx / currentDist;
+                    const normY = dy / currentDist;
+
+                    const radialVel = player.vx * normX + player.vy * normY;
+
+                    if (radialVel > 0) {
+                        player.vx -= radialVel * normX;
+                        player.vy -= radialVel * normY;
+                    }
+                }
+            }
+
+            const friction = player.isGrounded ? player.groundFriction : player.airFriction;
+            player.vx *= friction;
+            
+            if (player.hook.active) {
+                player.vx = Math.max(-20, Math.min(20, player.vx));
+            }
+
+            platforms.forEach(p => p.x -= scrollSpeed);
+            items.forEach(i => i.x -= scrollSpeed);
+            obstacles.forEach(o => o.x -= scrollSpeed);
+            
+            if (player.hook.active) {
+                player.hook.x -= scrollSpeed;
+            }
+
+            if (!player.hook.active && player.isGrounded) {
+                if (player.x > 100) player.vx -= 1;
+                if (player.x < 100) player.vx += 1;
+            }
+
+            player.x += player.vx;
+            
+            if (player.x < 0) {
+                player.x = 0;
+                player.vx = 0;
+            }
+            if (player.x + player.w > canvas.width) {
+                player.x = canvas.width - player.w;
+                player.vx = 0;
+            }
+
+            let nextY = player.y + player.vy;
+            player.isGrounded = false;
+            let currentHeight = player.isDucking ? player.h / 2 : player.h;
+
+            for (let i = 0; i < platforms.length; i++) {
+                let p = platforms[i];
+                if (player.x < p.x + p.w && player.x + player.w > p.x) {
+                    if (player.y + currentHeight <= p.y + Math.max(15, player.vy) && nextY + currentHeight >= p.y) {
+                        nextY = p.y - currentHeight;
+                        player.vy = 0;
+                        player.isGrounded = true;
+                        
+                        if (player.hook.active) {
+                            player.hook.active = false;
+                        }
+                    }
+                }
+            }
+            player.y = nextY;
+
+            if (player.y > canvas.height) gameOver();
+
+            for (let o of obstacles) {
+                if (player.x < o.x + o.w && player.x + player.w > o.x && 
+                    player.y < o.y + o.h && player.y + currentHeight > o.y) {
+                    gameOver();
+                }
+            }
+
+            for (let i = 0; i < items.length; i++) {
+                let item = items[i];
+                if (!item.collected && player.x < item.x + item.w && player.x + player.w > item.x && 
+                    player.y < item.y + item.h && player.y + currentHeight > item.y) {
+                    item.collected = true;
+                    wallet += item.val;
+                    updateUI();
+                }
+            }
+
+            // Korrigerad städrutin. Iteratorn 'i' används konsekvent.
+            platforms = platforms.filter(p => p.x + p.w > 0);
+            items = items.filter(i => i.x + i.w > 0 && !i.collected);
+            obstacles = obstacles.filter(o => o.x + o.w > 0);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = "#333";
+            platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+
+            ctx.fillStyle = "#ff4444";
+            obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
+
+            ctx.fillStyle = "#ffd700";
+            items.forEach(i => ctx.fillRect(i.x, i.y, i.w, i.h));
+
+            if (player.hook.active) {
+                ctx.strokeStyle = "#00ff41";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(player.x + player.w / 2, player.y + 10);
+                ctx.lineTo(player.hook.x, player.hook.y);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = player.isDucking ? "#0088ff" : "#00ff41";
+            let drawH = player.isDucking ? player.h / 2 : player.h;
+            let drawY = player.isDucking ? player.y + player.h / 2 : player.y;
+            ctx.fillRect(player.x, drawY, player.w, drawH);
+        }
+
+        function loop() {
+            update();
+            draw();
+            if (gameActive) {
+                animationFrameId = requestAnimationFrame(loop);
+            }
+        }
+
+        function gameOver() {
+            gameActive = false;
+            cancelAnimationFrame(animationFrameId);
+            showMsg("MISSION FAILED<br>You were eliminated.<br><br>Press [ R ] to redeploy.");
+        }
+
+        function extract() {
+            if (wallet >= 5000 && gameActive) {
+                bank += (wallet - 500);
+                wallet = 0;
+                updateUI();
+                gameActive = false;
+                cancelAnimationFrame(animationFrameId);
+                showMsg("EXTRACTION SUCCESSFUL<br>You are out of the zone. Operational fee: $500.<br><br>Press [ R ] for the next drop.");
+            }
+        }
+
+        function showMsg(txt) {
+            msgEl.innerHTML = txt;
+            msgEl.style.display = "block";
+        }
+
+        window.addEventListener('keydown', e => {
+            if (e.code === 'Space' && player.isGrounded && gameActive) player.vy = player.jumpPower;
+            if (e.code === 'ArrowDown' && gameActive) player.isDucking = true;
+            if (e.code === 'KeyE') extract();
+            if (e.code === 'KeyR' && !gameActive) {
+                initLevel();
+                loop();
+            }
+        });
+
+        window.addEventListener('keyup', e => {
+            if (e.code === 'ArrowDown') player.isDucking = false;
+        });
+
+        canvas.addEventListener('mousedown', e => {
+            if (!gameActive) return;
+            const rect = canvas.getBoundingClientRect();
+            const targetX = e.clientX - rect.left;
+            const targetY = e.clientY - rect.top;
+
+            let validTarget = false;
+            for (let i = 0; i < platforms.length; i++) {
+                let p = platforms[i];
+                if (targetX >= p.x && targetX <= p.x + p.w &&
+                    targetY >= p.y && targetY <= p.y + p.h) {
+                    validTarget = true;
+                    break;
+                }
+            }
+
+            if (validTarget) {
+                player.hook.x = targetX;
+                player.hook.y = targetY;
+                
+                const playerCenterX = player.x + player.w / 2;
+                const playerCenterY = player.y + player.h / 2;
+                const dx = playerCenterX - targetX;
+                const dy = playerCenterY - targetY;
+                player.hook.length = Math.sqrt(dx * dx + dy * dy);
+                
+                player.hook.active = true;
+                
+                player.vx += player.jumpPower * 0.5; 
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            player.hook.active = false;
+        });
+
+        initLevel();
+        loop();
+    </script>
+</body>
+</html>
