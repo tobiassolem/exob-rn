@@ -1,4 +1,4 @@
 # Exobörn
-Infinite runner slash extraction shooter
+Infinite extraction runner with looting mechanisms.
 
 Totally not an annoying prank game
