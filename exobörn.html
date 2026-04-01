@@ -56,6 +56,102 @@
 
         const API_URL = 'scores.php'; 
 
+        // --- AUDIO ENGINE ---
+        let audioCtx = null;
+        let mainGain = null;
+        let musicGain = null;
+        let isMusicPlaying = false;
+
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            mainGain = audioCtx.createGain();
+            mainGain.connect(audioCtx.destination);
+            mainGain.gain.value = 0.3;
+
+            musicGain = audioCtx.createGain();
+            musicGain.connect(mainGain);
+            musicGain.gain.value = 0.2;
+            startMusic();
+        }
+
+        function playSfx(freq, type, duration, slide = 0, volume = 1) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            if (slide) osc.frequency.exponentialRampToValueAtTime(freq + slide, audioCtx.currentTime + duration);
+            g.gain.setValueAtTime(volume, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(g);
+            g.connect(mainGain);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function startMusic() {
+            if (isMusicPlaying) return;
+            isMusicPlaying = true;
+            const tempo = 140;
+            const step = 60 / tempo / 2;
+            let bar = 0;
+            
+            const bassline = [40, 40, 45, 40, 38, 38, 43, 40];
+            const lead = [null, 60, 64, 67, 72, 67, 64, 60, null, 62, 65, 69, 74, 69, 65, 62];
+
+            function playBar() {
+                for (let i = 0; i < 8; i++) {
+                    const time = audioCtx.currentTime + i * step;
+                    // Bass
+                    const bFreq = 440 * Math.pow(2, (bassline[bar % 8] - 69) / 12);
+                    const bOsc = audioCtx.createOscillator();
+                    const bG = audioCtx.createGain();
+                    bOsc.type = 'square';
+                    bOsc.frequency.setValueAtTime(bFreq, time);
+                    bG.gain.setValueAtTime(0.1, time);
+                    bG.gain.exponentialRampToValueAtTime(0.01, time + step * 0.8);
+                    bOsc.connect(bG);
+                    bG.connect(musicGain);
+                    bOsc.start(time);
+                    bOsc.stop(time + step);
+
+                    // Melody (Silly quirky lead)
+                    if (bar % 2 === 0 && Math.random() > 0.3) {
+                        const note = lead[Math.floor(Math.random() * lead.length)];
+                        if (note) {
+                            const lFreq = 440 * Math.pow(2, (note - 69) / 12);
+                            const lOsc = audioCtx.createOscillator();
+                            const lG = audioCtx.createGain();
+                            lOsc.type = 'triangle';
+                            lOsc.frequency.setValueAtTime(lFreq, time);
+                            lG.gain.setValueAtTime(0.08, time);
+                            lG.gain.exponentialRampToValueAtTime(0.01, time + step * 1.5);
+                            lOsc.connect(lG);
+                            lG.connect(musicGain);
+                            lOsc.start(time);
+                            lOsc.stop(time + step * 2);
+                        }
+                    }
+                }
+                bar++;
+                setTimeout(playBar, step * 8 * 1000);
+            }
+            playBar();
+        }
+
+        // SFX Trigger Functions
+        const sfx = {
+            jump: () => playSfx(150, 'square', 0.2, 400),
+            loot1: () => playSfx(880, 'triangle', 0.1, 200),
+            loot2: () => { playSfx(880, 'triangle', 0.1); setTimeout(() => playSfx(1320, 'triangle', 0.1), 50); },
+            loot3: () => { playSfx(1320, 'square', 0.1); setTimeout(() => playSfx(1760, 'square', 0.1), 50); setTimeout(() => playSfx(2640, 'square', 0.1), 100); },
+            hook: () => playSfx(400, 'sawtooth', 0.1, -200, 0.5),
+            death: () => playSfx(300, 'sawtooth', 1.5, -280, 0.8),
+            win: () => { [60, 64, 67, 72].forEach((n, i) => setTimeout(() => playSfx(440 * Math.pow(2, (n - 69) / 12), 'triangle', 0.4), i * 150)); }
+        };
+
+        // --- GAME LOGIC ---
         let bank = 0;
         let wallet = 0;
         let gameActive = false;
@@ -67,7 +163,6 @@
         let charIndex = 0;
         const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?#";
 
-        // Physics Constants
         const GRAVITY = 0.55;
         const JUMP_POWER = -12.5;
         const AIR_FRICTION = 0.988;
@@ -107,20 +202,16 @@
         async function fetchScores() {
             leaderboardStatus = "LOADING";
             try {
-                // Add timestamp to bypass any browser cache
                 const res = await fetch(API_URL + "?t=" + Date.now());
                 const data = await res.json();
-                
                 if (!res.ok) {
-                    lastError = data.error || "Server error: " + res.status;
+                    lastError = data.error || "Server error";
                     leaderboardStatus = "ERROR";
                 } else {
                     highScores = Array.isArray(data) ? data : [];
                     leaderboardStatus = highScores.length > 0 ? "READY" : "EMPTY";
-                    if (leaderboardStatus === "EMPTY") console.warn("PHP returned success but empty array.");
                 }
             } catch (err) {
-                console.error("Failed to fetch scores", err);
                 leaderboardStatus = "ERROR";
                 lastError = "Connection Failed";
             }
@@ -133,34 +224,18 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name, score })
                 });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Save Failed");
-                highScores = data;
+                highScores = await res.json();
                 leaderboardStatus = "READY";
             } catch (err) {
-                console.error("Failed to submit score", err);
                 leaderboardStatus = "ERROR";
                 lastError = "Save Failed";
             }
         }
 
         function initLevel() {
+            initAudio();
             platforms = [{ x: 0, y: 450, w: 1200, h: 50 }];
             lastPlatformEndX = 1200;
-            
-            if (bgLayers[0].elements.length === 0) {
-                bgLayers.forEach((layer, i) => {
-                    for(let j=0; j<12; j++) {
-                        layer.elements.push({
-                            x: j * (canvas.width/6) + Math.random() * 50,
-                            y: 50 + Math.random() * 350,
-                            w: 20 + Math.random() * 80,
-                            h: 100 + Math.random() * 500
-                        });
-                    }
-                });
-            }
-
             items = []; obstacles = [];
             player.x = 150; player.y = 250; player.vx = 0; player.vy = 0;
             player.hook.active = false; wallet = 0;
@@ -244,6 +319,7 @@
                 }
             }
             if (jumpBuffer > 0 && (player.isGrounded || coyoteTime > 0)) {
+                sfx.jump();
                 player.vy = JUMP_POWER; player.isGrounded = false; coyoteTime = 0; jumpBuffer = 0;
                 player.hook.active = false;
             }
@@ -253,6 +329,7 @@
             for (let o of obstacles) if (player.x < o.x + o.w && player.x + player.w > o.x && pT < o.y + o.h && pT + pH > o.y) gameOver();
             for (let i of items) if (!i.collected && player.x < i.x + i.w && player.x + player.w > i.x && pT < i.y + i.h && pT + pH > i.y) {
                 i.collected = true; wallet += i.val; updateUI();
+                if (i.tier === 1) sfx.loot1(); else if (i.tier === 2) sfx.loot2(); else sfx.loot3();
             }
             platforms = platforms.filter(p => p.x + p.w > -100);
             items = items.filter(i => i.x + i.w > -100 && !i.collected);
@@ -299,7 +376,6 @@
                 else if (leaderboardStatus === "ERROR") {
                     ctx.fillStyle = "#ff5500"; ctx.fillText("DB ACCESS ERROR", 500, 220);
                     ctx.font = "7px 'Press Start 2P'"; ctx.fillText(lastError.toUpperCase().substring(0, 40), 500, 260);
-                    if(lastError.length > 40) ctx.fillText(lastError.toUpperCase().substring(40, 80), 500, 280);
                 } else if (leaderboardStatus === "EMPTY") ctx.fillText("NO DATA LOGGED", 500, 240);
                 else {
                     highScores.forEach((s, i) => {
@@ -307,15 +383,13 @@
                         ctx.textAlign = "right"; ctx.fillText(`$${s.score.toLocaleString()}`, 700, 160 + i * 26);
                     });
                 }
-                if (!gameActive) {
-                    ctx.textAlign = "center"; ctx.fillStyle = "#fff5e0"; ctx.fillText("PRESS [R] TO DEPLOY", 500, 410);
-                }
+                if (!gameActive) { ctx.textAlign = "center"; ctx.fillStyle = "#fff5e0"; ctx.fillText("PRESS [R] TO DEPLOY", 500, 410); }
             }
         }
 
         function loop(time) { const dt = time - lastTime; lastTime = time; update(dt); draw(); animationFrameId = requestAnimationFrame(loop); }
-        function gameOver() { if (!gameActive) return; gameActive = false; checkHighScore(); if (!enteringScore) { showMsg("<span style='color:#ff5500; font-size: 16px;'>SYSTEM FAILURE</span><br><br>Unit destroyed. Data scrubbed.<br><br>[R] TO REBOOT"); showLeaderboard = true; fetchScores(); } }
-        function extract() { if (wallet >= 5000 && gameActive) { bank += (wallet - 500); let f = wallet; wallet = 0; updateUI(); gameActive = false; checkHighScore(f); if (!enteringScore) { showMsg("<span style='color:#ffb000; font-size: 16px;'>EXTRACTION COMPLETE</span><br><br>Security fee: $500.<br><br>[R] FOR NEW DROP"); showLeaderboard = true; fetchScores(); } } }
+        function gameOver() { if (!gameActive) return; gameActive = false; sfx.death(); checkHighScore(); if (!enteringScore) { showMsg("<span style='color:#ff5500; font-size: 16px;'>SYSTEM FAILURE</span><br><br>Unit destroyed. Data scrubbed.<br><br>[R] TO REBOOT"); showLeaderboard = true; fetchScores(); } }
+        function extract() { if (wallet >= 5000 && gameActive) { bank += (wallet - 500); let f = wallet; wallet = 0; sfx.win(); updateUI(); gameActive = false; checkHighScore(f); if (!enteringScore) { showMsg("<span style='color:#ffb000; font-size: 16px;'>EXTRACTION COMPLETE</span><br><br>Security fee: $500.<br><br>[R] FOR NEW DROP"); showLeaderboard = true; fetchScores(); } } }
         function checkHighScore(s = wallet) { if (s > 0 && (highScores.length < 10 || s > highScores[highScores.length - 1]?.score)) { enteringScore = true; initialsOverlay.style.display = "block"; charIndex = 0; updateInitialsDisplay(); } }
         function updateInitialsDisplay() { for(let i=0; i<3; i++) { const el = document.getElementById('l' + i); el.innerText = currentInitials[i]; el.classList.toggle('active', i === charIndex); } }
         async function saveScore() { const n = currentInitials.join(''); const s = wallet || (bank + 500); await submitScore(n, s); enteringScore = false; initialsOverlay.style.display = "none"; showLeaderboard = true; showMsg("<span style='color:#ffb000;'>DATA ARCHIVED</span><br><br>Operative " + n + " logged.<br><br>[R] TO REBOOT"); }
@@ -338,7 +412,7 @@
             if (!gameActive || enteringScore) return;
             const r = canvas.getBoundingClientRect(); const tX = e.clientX - r.left; const tY = e.clientY - r.top;
             let v = false; for (let p of platforms) if (tX >= p.x && tX <= p.x + p.w && tY >= p.y && tY <= p.y + p.h) { v = true; break; }
-            if (v) { player.hook.x = tX; player.hook.y = tY; const dx = (player.x + player.w/2) - tX, dy = (player.y + player.h/2) - tY; player.hook.length = Math.sqrt(dx*dx + dy*dy); player.hook.active = true; player.vy -= 1.5; }
+            if (v) { sfx.hook(); player.hook.x = tX; player.hook.y = tY; const dx = (player.x + player.w/2) - tX, dy = (player.y + player.h/2) - tY; player.hook.length = Math.sqrt(dx*dx + dy*dy); player.hook.active = true; player.vy -= 1.5; }
         });
         canvas.addEventListener('mouseup', () => player.hook.active = false);
         for(let i=0; i<3; i++) for(let j=0; j<12; j++) bgLayers[i].elements.push({ x: j * (canvas.width/6) + Math.random() * 50, y: 50 + Math.random() * 350, w: 20 + Math.random() * 80, h: 100 + Math.random() * 500 });
