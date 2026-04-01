@@ -3,43 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <title>EXOBÖRN</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
-        body { background: #0a0a0a; color: #00ff41; font-family: 'Courier New', Courier, monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        #ui { width: 800px; display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 2px solid #00ff41; padding-bottom: 5px; text-shadow: 0 0 5px #00ff41; }
-        canvas { border: 4px solid #111; background: #020202; box-shadow: 0 0 30px rgba(0, 255, 65, 0.1); cursor: crosshair; }
-        .controls { margin-top: 15px; font-size: 0.8em; color: #555; text-align: center; line-height: 1.5; }
-        #initials-overlay { position: absolute; background: rgba(0,0,0,0.95); border: 2px solid #00ff41; padding: 30px; display: none; text-align: center; z-index: 100; box-shadow: 0 0 50px #000; }
-        .letter { font-size: 40px; margin: 0 10px; display: inline-block; width: 40px; border-bottom: 3px solid #00ff41; }
-        .letter.active { color: #fff; border-color: #fff; animation: blink 0.5s infinite; }
+        :root {
+            --retro-yellow: #ffb000;
+            --retro-dim: #664400;
+            --retro-black: #050400;
+            --retro-white: #fff5e0;
+            --tier-2: #00d4ff;
+            --tier-3: #ff00ff;
+        }
+        body { background: var(--retro-black); color: var(--retro-yellow); font-family: 'Press Start 2P', cursive; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        #ui { width: 1000px; display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 2px solid var(--retro-yellow); padding-bottom: 10px; text-shadow: 0 0 10px var(--retro-yellow); font-size: 12px; }
+        canvas { border: 4px solid var(--retro-dim); background: #080700; box-shadow: 0 0 40px rgba(255, 176, 0, 0.2); cursor: crosshair; image-rendering: pixelated; }
+        .controls { margin-top: 25px; font-size: 10px; color: var(--retro-white); text-align: center; line-height: 2; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 0 5px var(--retro-yellow); }
+        #initials-overlay { position: absolute; background: rgba(5,4,0,0.98); border: 4px solid var(--retro-yellow); padding: 50px; display: none; text-align: center; z-index: 100; box-shadow: 0 0 150px #000; color: var(--retro-yellow); }
+        .letter { font-size: 40px; margin: 0 15px; display: inline-block; width: 40px; border-bottom: 6px solid var(--retro-yellow); padding-bottom: 10px; }
+        .letter.active { color: var(--retro-white); border-color: var(--retro-white); animation: blink 0.4s infinite; }
         @keyframes blink { 50% { opacity: 0; } }
+        #msg { position: absolute; color: var(--retro-white); background: rgba(5,4,0,0.95); padding: 30px; display: none; text-align: center; border: 4px solid var(--retro-yellow); max-width: 600px; line-height: 2; box-shadow: 0 0 50px rgba(255,176,0,0.3); font-size: 12px; z-index: 50; }
     </style>
 </head>
 <body>
     <div id="ui">
         <div>BANK: $<span id="bank">0</span></div>
-        <div style="color: #fff; font-weight: bold; letter-spacing: 4px;">EXOBÖRN</div>
-        <div>CURRENT: $<span id="current">0</span></div>
+        <div style="color: var(--retro-white); font-weight: bold; letter-spacing: 4px;">EXOBÖRN</div>
+        <div>CURR: $<span id="current">0</span></div>
     </div>
-    <canvas id="gameCanvas" width="800" height="400"></canvas>
-    
-    <div id="msg" style="position: absolute; color: white; background: rgba(0,0,0,0.9); padding: 20px; display: none; text-align: center; border: 1px solid #00ff41; max-width: 400px; line-height: 1.6;"></div>
-    
+    <canvas id="gameCanvas" width="1000" height="500"></canvas>
+    <div id="msg"></div>
     <div id="initials-overlay">
-        <h2 style="color: #ffd700;">NEW TOP SCORE</h2>
-        <p>ENTER YOUR INITIALS</p>
+        <h2 style="color: var(--retro-white); margin-top: 0; font-size: 18px; margin-bottom: 30px;">GLOBAL RECORD</h2>
+        <p style="font-size: 10px; margin-bottom: 40px;">IDENTIFY OPERATIVE</p>
         <div id="initials-container">
             <span class="letter active" id="l0">A</span>
             <span class="letter" id="l1">A</span>
             <span class="letter" id="l2">A</span>
         </div>
-        <p style="font-size: 0.7em; margin-top: 20px; color: #555;">UP/DOWN: Change | SPACE: Confirm</p>
+        <p style="font-size: 8px; margin-top: 50px; color: var(--retro-dim);">[UP/DOWN] CYCLE | [SPACE] LOCK</p>
     </div>
-
     <div class="controls">
-        SPACE: Jump | DOWN: Duck | CLICK PLATFORM: Grapple <br>
-        E: Extraction ($5000+) | R: Deploy
+        <span style="color: var(--retro-yellow)">SPACE:</span> JUMP | <span style="color: var(--retro-yellow)">DOWN:</span> DUCK | <span style="color: var(--retro-yellow)">CLICK PLATFORM:</span> GRAPPLE <br>
+        <span style="color: var(--retro-yellow)">E:</span> EXTRACT ($5000+) | <span style="color: var(--retro-yellow)">R:</span> DEPLOY
     </div>
-
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -48,413 +54,295 @@
         const msgEl = document.getElementById('msg');
         const initialsOverlay = document.getElementById('initials-overlay');
 
+        const API_URL = 'scores.php'; 
+
         let bank = 0;
         let wallet = 0;
-        let gameActive = true;
+        let gameActive = false;
         let animationFrameId;
         let lastTime = 0;
         let enteringScore = false;
+        let showLeaderboard = true;
         let currentInitials = ['A', 'A', 'A'];
         let charIndex = 0;
-        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#";
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?#";
 
         // Physics Constants
-        const GRAVITY = 0.6;
-        const JUMP_POWER = -13;
-        const AIR_FRICTION = 0.985;
-        const GROUND_FRICTION = 0.82;
-        const SWING_BOOST = 0.4;
+        const GRAVITY = 0.55;
+        const JUMP_POWER = -12.5;
+        const AIR_FRICTION = 0.988;
+        const GROUND_FRICTION = 0.84;
+        const SWING_BOOST = 0.35;
         
         let coyoteTime = 0;
         let jumpBuffer = 0;
 
         const player = {
-            x: 100, y: 200, w: 26, h: 46,
+            x: 150, y: 250, w: 24, h: 44,
             vx: 0, vy: 0, 
             isGrounded: false,
             isDucking: false,
             hook: { active: false, x: 0, y: 0, length: 0 }
         };
 
+        let bgLayers = [
+            { speed: 0.1, elements: [] },
+            { speed: 0.3, elements: [] },
+            { speed: 0.6, elements: [] }
+        ];
+
         let platforms = [];
         let items = [];
         let obstacles = [];
-        let baseSpeed = 4.5;
+        let baseSpeed = 3.0;
         let scrollSpeed = baseSpeed;
         let frameCount = 0;
         let keys = {};
+        let lastPlatformEndX = 1200;
 
-        // High Score Logic
-        let highScores = JSON.parse(localStorage.getItem('exoborn_scores')) || [
-            { name: 'SAB', score: 10000 },
-            { name: 'RED', score: 7500 },
-            { name: 'RUN', score: 5000 },
-            { name: 'BCK', score: 3000 },
-            { name: 'VOD', score: 1000 }
-        ];
+        let highScores = [];
+        let leaderboardStatus = "LOADING"; 
+        let lastError = "";
+
+        async function fetchScores() {
+            leaderboardStatus = "LOADING";
+            try {
+                // Add timestamp to bypass any browser cache
+                const res = await fetch(API_URL + "?t=" + Date.now());
+                const data = await res.json();
+                
+                if (!res.ok) {
+                    lastError = data.error || "Server error: " + res.status;
+                    leaderboardStatus = "ERROR";
+                } else {
+                    highScores = Array.isArray(data) ? data : [];
+                    leaderboardStatus = highScores.length > 0 ? "READY" : "EMPTY";
+                    if (leaderboardStatus === "EMPTY") console.warn("PHP returned success but empty array.");
+                }
+            } catch (err) {
+                console.error("Failed to fetch scores", err);
+                leaderboardStatus = "ERROR";
+                lastError = "Connection Failed";
+            }
+        }
+
+        async function submitScore(name, score) {
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, score })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Save Failed");
+                highScores = data;
+                leaderboardStatus = "READY";
+            } catch (err) {
+                console.error("Failed to submit score", err);
+                leaderboardStatus = "ERROR";
+                lastError = "Save Failed";
+            }
+        }
 
         function initLevel() {
-            platforms = [
-                { x: 0, y: 350, w: 1000, h: 50 },
-                { x: 1200, y: 350, w: 800, h: 50 }
-            ];
-            items = [];
-            obstacles = [];
-            player.x = 100;
-            player.y = 200;
-            player.vx = 0;
-            player.vy = 0;
-            player.hook.active = false;
-            wallet = 0;
-            scrollSpeed = baseSpeed;
-            updateUI();
-            gameActive = true;
-            enteringScore = false;
-            msgEl.style.display = "none";
-            initialsOverlay.style.display = "none";
+            platforms = [{ x: 0, y: 450, w: 1200, h: 50 }];
+            lastPlatformEndX = 1200;
+            
+            if (bgLayers[0].elements.length === 0) {
+                bgLayers.forEach((layer, i) => {
+                    for(let j=0; j<12; j++) {
+                        layer.elements.push({
+                            x: j * (canvas.width/6) + Math.random() * 50,
+                            y: 50 + Math.random() * 350,
+                            w: 20 + Math.random() * 80,
+                            h: 100 + Math.random() * 500
+                        });
+                    }
+                });
+            }
+
+            items = []; obstacles = [];
+            player.x = 150; player.y = 250; player.vx = 0; player.vy = 0;
+            player.hook.active = false; wallet = 0;
+            scrollSpeed = baseSpeed; updateUI();
+            gameActive = true; enteringScore = false; showLeaderboard = false;
+            msgEl.style.display = "none"; initialsOverlay.style.display = "none";
             lastTime = performance.now();
         }
 
         function updateUI() {
             currentEl.innerText = wallet;
             bankEl.innerText = bank;
-            scrollSpeed = baseSpeed + (wallet / 2000);
+            scrollSpeed = gameActive ? baseSpeed + (wallet / 4000) : baseSpeed;
         }
 
         function spawnEntities() {
             frameCount++;
-            let spawnRate = Math.max(25, 70 - Math.floor(scrollSpeed * 2)); 
-            
-            if (frameCount % spawnRate === 0) {
-                platforms.push({ x: 800, y: 350, w: 300 + Math.random() * 400, h: 50 });
+            const diff = Math.min(1.5, (scrollSpeed - baseSpeed) / 5);
+            if (lastPlatformEndX < canvas.width + 500) {
+                const gap = 80 + Math.random() * 220 * (1 + diff);
+                const w = 250 + Math.random() * 600;
+                platforms.push({ x: lastPlatformEndX + gap, y: 400 + Math.random() * 70, w: w, h: 100 });
+                lastPlatformEndX = lastPlatformEndX + gap + w;
             }
-            if (frameCount % 110 === 0 && Math.random() > 0.4) {
-                platforms.push({ x: 800, y: 120 + Math.random() * 120, w: 180, h: 20 });
-            }
-            if (frameCount % 90 === 0) {
-                items.push({ x: 850, y: 80 + Math.random() * 200, w: 16, h: 16, val: 500 });
-            }
-            if (frameCount % 120 === 0 && Math.random() > 0.6) {
-                obstacles.push({ x: 850, y: 310, w: 40, h: 40 });
+            if (frameCount % 110 === 0) platforms.push({ x: canvas.width, y: 100 + Math.random() * 200, w: 120, h: 20 });
+            if (frameCount % 60 === 0) {
+                const luck = Math.random();
+                if (luck > 0.94) {
+                    items.push({ x: canvas.width, y: 40 + Math.random() * 80, w: 22, h: 22, val: 7500, tier: 3 });
+                    obstacles.push({ x: canvas.width + 40, y: 40 + Math.random() * 80, w: 35, h: 35 });
+                } else if (luck > 0.75) {
+                    items.push({ x: canvas.width, y: 160 + Math.random() * 120, w: 18, h: 18, val: 2500, tier: 2 });
+                } else if (luck > 0.4) {
+                    items.push({ x: canvas.width, y: 320 + Math.random() * 80, w: 15, h: 15, val: 500, tier: 1 });
+                }
+                if (Math.random() < 0.3 + diff) obstacles.push({ x: canvas.width, y: 100 + Math.random() * 300, w: 40, h: 40 });
             }
         }
 
         function update(dt) {
+            const scalar = dt / 16.66;
+            bgLayers.forEach(l => l.elements.forEach(e => {
+                e.x -= scrollSpeed * l.speed * scalar;
+                if (e.x + e.w < 0) e.x = canvas.width + Math.random() * 100;
+            }));
             if (!gameActive || enteringScore) return;
-
-            const scalar = dt / 16.66; // Normalize to 60fps
             spawnEntities();
-
-            // Gravity & Timers
             player.vy += GRAVITY * scalar;
             if (coyoteTime > 0) coyoteTime -= dt;
             if (jumpBuffer > 0) jumpBuffer -= dt;
-
-            // Grapple Physics (Pendulum Constraint)
+            lastPlatformEndX -= scrollSpeed * scalar;
+            platforms.forEach(p => p.x -= scrollSpeed * scalar);
+            items.forEach(i => i.x -= scrollSpeed * scalar);
+            obstacles.forEach(o => o.x -= scrollSpeed * scalar);
             if (player.hook.active) {
                 player.hook.x -= scrollSpeed * scalar;
-                const px = player.x + player.w/2;
-                const py = player.y + player.h/2;
-                const dx = px - player.hook.x;
-                const dy = py - player.hook.y;
+                const dx = (player.x + player.w/2) - player.hook.x;
+                const dy = (player.y + player.h/2) - player.hook.y;
                 const dist = Math.sqrt(dx*dx + dy*dy);
-
                 if (dist > player.hook.length) {
-                    const nx = dx / dist;
-                    const ny = dy / dist;
-
-                    // Pull player to rope boundary
+                    const nx = dx / dist, ny = dy / dist;
                     player.x = player.hook.x + nx * player.hook.length - player.w/2;
                     player.y = player.hook.y + ny * player.hook.length - player.h/2;
-
-                    // Constrain velocity to tangential (perpendicular to rope)
-                    const velDotNormal = player.vx * nx + player.vy * ny;
-                    if (velDotNormal > 0) {
-                        player.vx -= velDotNormal * nx;
-                        player.vy -= velDotNormal * ny;
-                    }
-                    
-                    // Swing Boost
+                    const dot = player.vx * nx + player.vy * ny;
+                    if (dot > 0) { player.vx -= dot * nx; player.vy -= dot * ny; }
                     if (keys['ArrowRight'] || keys['KeyD']) player.vx += SWING_BOOST * scalar;
                     if (keys['ArrowLeft'] || keys['KeyA']) player.vx -= SWING_BOOST * scalar;
                 }
             }
-
-            // Standard Movement & Friction
-            const friction = player.isGrounded ? GROUND_FRICTION : AIR_FRICTION;
-            player.vx *= Math.pow(friction, scalar);
-            
-            // Auto-center (Ease back to x=100)
-            if (!player.hook.active) {
-                player.vx += (100 - player.x) * 0.02 * scalar;
-            }
-
-            // Apply Velocity
-            player.x += player.vx * scalar;
-            player.y += player.vy * scalar;
-
-            // Scroll World
-            platforms.forEach(p => p.x -= scrollSpeed * scalar);
-            items.forEach(i => i.x -= scrollSpeed * scalar);
-            obstacles.forEach(o => o.x -= scrollSpeed * scalar);
-
-            // Collision Resolution
+            player.vx *= Math.pow(player.isGrounded ? GROUND_FRICTION : AIR_FRICTION, scalar);
+            if (!player.hook.active) player.vx += (150 - player.x) * 0.015 * scalar;
+            player.x += player.vx * scalar; player.y += player.vy * scalar;
             player.isGrounded = false;
-            let pHeight = player.isDucking ? player.h / 2 : player.h;
-            let pTop = player.isDucking ? player.y + player.h / 2 : player.y;
-
+            let pH = player.isDucking ? player.h / 2 : player.h;
+            let pT = player.isDucking ? player.y + player.h / 2 : player.y;
             for (let p of platforms) {
                 if (player.x + player.w > p.x && player.x < p.x + p.w) {
-                    // Top collision
-                    if (player.vy >= 0 && pTop + pHeight >= p.y && pTop + pHeight <= p.y + 20) {
-                        player.y = p.y - player.h; // Always set base Y relative to full height
-                        player.vy = 0;
-                        player.isGrounded = true;
-                        coyoteTime = 100; // 100ms coyote time
+                    if (player.vy >= 0 && pT + pH >= p.y && pT + pH <= p.y + 30) {
+                        player.y = p.y - player.h; player.vy = 0; player.isGrounded = true; coyoteTime = 120;
                     }
                 }
             }
-
-            // Jump Buffering & Execution
             if (jumpBuffer > 0 && (player.isGrounded || coyoteTime > 0)) {
-                player.vy = JUMP_POWER;
-                player.isGrounded = false;
-                coyoteTime = 0;
-                jumpBuffer = 0;
-                if (player.hook.active) player.hook.active = false;
+                player.vy = JUMP_POWER; player.isGrounded = false; coyoteTime = 0; jumpBuffer = 0;
+                player.hook.active = false;
             }
-
-            // Screen boundaries
             if (player.x < 0) { player.x = 0; player.vx = 0; }
             if (player.x + player.w > canvas.width) { player.x = canvas.width - player.w; player.vx = 0; }
             if (player.y > canvas.height) gameOver();
-
-            // Entities
-            for (let o of obstacles) {
-                if (player.x < o.x + o.w && player.x + player.w > o.x && 
-                    pTop < o.y + o.h && pTop + pHeight > o.y) {
-                    gameOver();
-                }
+            for (let o of obstacles) if (player.x < o.x + o.w && player.x + player.w > o.x && pT < o.y + o.h && pT + pH > o.y) gameOver();
+            for (let i of items) if (!i.collected && player.x < i.x + i.w && player.x + player.w > i.x && pT < i.y + i.h && pT + pH > i.y) {
+                i.collected = true; wallet += i.val; updateUI();
             }
-
-            for (let i of items) {
-                if (!i.collected && player.x < i.x + i.w && player.x + player.w > i.x && 
-                    pTop < i.y + i.h && pTop + pHeight > i.y) {
-                    i.collected = true;
-                    wallet += i.val;
-                    updateUI();
-                }
-            }
-
-            platforms = platforms.filter(p => p.x + p.w > 0);
-            items = items.filter(i => i.x + i.w > 0 && !i.collected);
-            obstacles = obstacles.filter(o => o.x + o.w > 0);
+            platforms = platforms.filter(p => p.x + p.w > -100);
+            items = items.filter(i => i.x + i.w > -100 && !i.collected);
+            obstacles = obstacles.filter(o => o.x + o.w > -100);
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Scanlines effect
-            ctx.fillStyle = "rgba(0, 255, 65, 0.03)";
-            for(let i=0; i<canvas.height; i+=4) ctx.fillRect(0, i, canvas.width, 1);
-
-            ctx.fillStyle = "#111";
-            platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
-
-            ctx.fillStyle = "#ff4444";
-            obstacles.forEach(o => {
-                ctx.fillRect(o.x, o.y, o.w, o.h);
-                ctx.strokeStyle = "#fff";
-                ctx.strokeRect(o.x+5, o.y+5, o.w-10, o.h-10);
+            bgLayers.forEach((l, i) => {
+                ctx.fillStyle = i === 0 ? "#0c0a00" : (i === 1 ? "#151200" : "#1f1a00");
+                l.elements.forEach(e => ctx.fillRect(e.x, e.y, e.w, e.h));
             });
-
-            ctx.fillStyle = "#ffd700";
-            items.forEach(i => {
-                ctx.beginPath();
-                ctx.arc(i.x + i.w/2, i.y + i.h/2, i.w/2, 0, Math.PI*2);
-                ctx.fill();
-            });
-
-            if (player.hook.active) {
-                ctx.strokeStyle = "#00ff41";
-                ctx.lineWidth = 2;
-                ctx.setLineDash([5, 5]);
-                ctx.beginPath();
-                ctx.moveTo(player.x + player.w / 2, player.y + 10);
-                ctx.lineTo(player.hook.x, player.hook.y);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                
-                // Draw hook point
-                ctx.fillStyle = "#fff";
-                ctx.fillRect(player.hook.x-4, player.hook.y-4, 8, 8);
+            ctx.fillStyle = "rgba(255, 176, 0, 0.05)";
+            for(let i=0; i<canvas.height; i+=4) ctx.fillRect(0, i, canvas.width, 2);
+            if (gameActive) {
+                ctx.fillStyle = "#332800"; platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+                obstacles.forEach(o => {
+                    ctx.fillStyle = "#ff5500"; ctx.fillRect(o.x, o.y, o.w, o.h);
+                    ctx.strokeStyle = "#ffb000"; ctx.lineWidth = 2; ctx.strokeRect(o.x+4, o.y+4, o.w-8, o.h-8);
+                    if (frameCount % 20 < 10) { ctx.fillStyle = "#fff"; ctx.fillRect(o.x + o.w/2 - 2, o.y + o.h/2 - 2, 4, 4); }
+                });
+                items.forEach(i => {
+                    ctx.fillStyle = i.tier === 2 ? "#00d4ff" : (i.tier === 3 ? "#ff00ff" : "#ffb000");
+                    ctx.beginPath(); ctx.arc(i.x + i.w/2, i.y + i.h/2, i.w/2, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = "#fff"; ctx.fillRect(i.x + i.w/4, i.y + i.h/4, i.w/4, i.h/4);
+                });
+                if (player.hook.active) {
+                    ctx.strokeStyle = "#ffb000"; ctx.lineWidth = 1; ctx.setLineDash([8, 4]);
+                    ctx.beginPath(); ctx.moveTo(player.x + player.w / 2, player.y + 10); ctx.lineTo(player.hook.x, player.hook.y); ctx.stroke();
+                    ctx.setLineDash([]); ctx.fillStyle = "#fff"; ctx.fillRect(player.hook.x-5, player.hook.y-5, 10, 10);
+                }
+                ctx.fillStyle = player.isDucking ? "#886000" : "#ffb000";
+                let dH = player.isDucking ? player.h / 2 : player.h, dY = player.isDucking ? player.y + player.h / 2 : player.y;
+                ctx.fillRect(player.x, dY, player.w, dH);
+                ctx.fillStyle = "#fff"; ctx.fillRect(player.x + (player.vx > 0 ? 16 : 4), dY + 6, 5, 5);
             }
-
-            ctx.fillStyle = player.isDucking ? "#0088ff" : "#00ff41";
-            let drawH = player.isDucking ? player.h / 2 : player.h;
-            let drawY = player.isDucking ? player.y + player.h / 2 : player.y;
-            ctx.fillRect(player.x, drawY, player.w, drawH);
-            
-            // Player "Eye"
-            ctx.fillStyle = "#fff";
-            ctx.fillRect(player.x + (player.vx > 0 ? 18 : 4), drawY + 8, 4, 4);
-
-            if (!gameActive && !enteringScore) {
-                drawLeaderboard();
-            }
-        }
-
-        function drawLeaderboard() {
-            ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-            ctx.fillRect(200, 40, 400, 320);
-            ctx.strokeStyle = "#00ff41";
-            ctx.strokeRect(200, 40, 400, 320);
-            
-            ctx.fillStyle = "#00ff41";
-            ctx.font = "bold 18px 'Courier New'";
-            ctx.textAlign = "center";
-            ctx.fillText("TOP OPERATIVES", 400, 75);
-            
-            ctx.font = "14px 'Courier New'";
-            highScores.slice(0, 10).forEach((s, i) => {
-                let y = 110 + i * 22;
-                ctx.textAlign = "left";
-                ctx.fillText(`${i+1}. ${s.name}`, 250, y);
-                ctx.textAlign = "right";
-                ctx.fillText(`$${s.score.toLocaleString()}`, 550, y);
-            });
-        }
-
-        function loop(time) {
-            const dt = time - lastTime;
-            lastTime = time;
-            
-            update(dt);
-            draw();
-            animationFrameId = requestAnimationFrame(loop);
-        }
-
-        function gameOver() {
-            if (!gameActive) return;
-            gameActive = false;
-            checkHighScore();
-            if (!enteringScore) {
-                showMsg("MISSION FAILED<br><span style='color:#ff4444'>You were eliminated.</span><br><br>Press [ R ] to redeploy.");
-            }
-        }
-
-        function extract() {
-            if (wallet >= 5000 && gameActive) {
-                bank += (wallet - 500);
-                let finalScore = wallet;
-                wallet = 0;
-                updateUI();
-                gameActive = false;
-                checkHighScore(finalScore);
-                if (!enteringScore) {
-                    showMsg("EXTRACTION SUCCESSFUL<br>Operational fee: $500.<br><br>Press [ R ] for next drop.");
+            if (showLeaderboard && !enteringScore) {
+                ctx.fillStyle = "rgba(5, 4, 0, 0.9)"; ctx.fillRect(250, 60, 500, 380);
+                ctx.strokeStyle = "#ffb000"; ctx.lineWidth = 4; ctx.strokeRect(250, 60, 500, 380);
+                ctx.fillStyle = "#ffb000"; ctx.font = "16px 'Press Start 2P'"; ctx.textAlign = "center";
+                ctx.fillText("GLOBAL ELITE", 500, 110);
+                ctx.font = "10px 'Press Start 2P'";
+                if (leaderboardStatus === "LOADING") ctx.fillText("CONNECTING...", 500, 240);
+                else if (leaderboardStatus === "ERROR") {
+                    ctx.fillStyle = "#ff5500"; ctx.fillText("DB ACCESS ERROR", 500, 220);
+                    ctx.font = "7px 'Press Start 2P'"; ctx.fillText(lastError.toUpperCase().substring(0, 40), 500, 260);
+                    if(lastError.length > 40) ctx.fillText(lastError.toUpperCase().substring(40, 80), 500, 280);
+                } else if (leaderboardStatus === "EMPTY") ctx.fillText("NO DATA LOGGED", 500, 240);
+                else {
+                    highScores.forEach((s, i) => {
+                        ctx.textAlign = "left"; ctx.fillText(`${(i+1).toString().padStart(2, '0')} ${s.name}`, 300, 160 + i * 26);
+                        ctx.textAlign = "right"; ctx.fillText(`$${s.score.toLocaleString()}`, 700, 160 + i * 26);
+                    });
+                }
+                if (!gameActive) {
+                    ctx.textAlign = "center"; ctx.fillStyle = "#fff5e0"; ctx.fillText("PRESS [R] TO DEPLOY", 500, 410);
                 }
             }
         }
 
-        function checkHighScore(score = wallet) {
-            if (score > 0 && (highScores.length < 10 || score > highScores[highScores.length - 1].score)) {
-                enteringScore = true;
-                initialsOverlay.style.display = "block";
-                charIndex = 0;
-                updateInitialsDisplay();
-            }
-        }
-
-        function updateInitialsDisplay() {
-            for(let i=0; i<3; i++) {
-                const el = document.getElementById('l' + i);
-                el.innerText = currentInitials[i];
-                el.classList.toggle('active', i === charIndex);
-            }
-        }
-
-        function saveScore() {
-            const name = currentInitials.join('');
-            highScores.push({ name, score: wallet });
-            highScores.sort((a, b) => b.score - a.score);
-            highScores = highScores.slice(0, 10);
-            localStorage.setItem('exoborn_scores', JSON.stringify(highScores));
-            enteringScore = false;
-            initialsOverlay.style.display = "none";
-            showMsg("SCORE RECORDED<br>Operative " + name + " verified.<br><br>Press [ R ] to redeploy.");
-        }
-
-        function showMsg(txt) {
-            msgEl.innerHTML = txt;
-            msgEl.style.display = "block";
-        }
-
+        function loop(time) { const dt = time - lastTime; lastTime = time; update(dt); draw(); animationFrameId = requestAnimationFrame(loop); }
+        function gameOver() { if (!gameActive) return; gameActive = false; checkHighScore(); if (!enteringScore) { showMsg("<span style='color:#ff5500; font-size: 16px;'>SYSTEM FAILURE</span><br><br>Unit destroyed. Data scrubbed.<br><br>[R] TO REBOOT"); showLeaderboard = true; fetchScores(); } }
+        function extract() { if (wallet >= 5000 && gameActive) { bank += (wallet - 500); let f = wallet; wallet = 0; updateUI(); gameActive = false; checkHighScore(f); if (!enteringScore) { showMsg("<span style='color:#ffb000; font-size: 16px;'>EXTRACTION COMPLETE</span><br><br>Security fee: $500.<br><br>[R] FOR NEW DROP"); showLeaderboard = true; fetchScores(); } } }
+        function checkHighScore(s = wallet) { if (s > 0 && (highScores.length < 10 || s > highScores[highScores.length - 1]?.score)) { enteringScore = true; initialsOverlay.style.display = "block"; charIndex = 0; updateInitialsDisplay(); } }
+        function updateInitialsDisplay() { for(let i=0; i<3; i++) { const el = document.getElementById('l' + i); el.innerText = currentInitials[i]; el.classList.toggle('active', i === charIndex); } }
+        async function saveScore() { const n = currentInitials.join(''); const s = wallet || (bank + 500); await submitScore(n, s); enteringScore = false; initialsOverlay.style.display = "none"; showLeaderboard = true; showMsg("<span style='color:#ffb000;'>DATA ARCHIVED</span><br><br>Operative " + n + " logged.<br><br>[R] TO REBOOT"); }
+        function showMsg(t) { msgEl.innerHTML = t; msgEl.style.display = "block"; }
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
-            
             if (enteringScore) {
-                if (e.code === 'ArrowUp') {
-                    let idx = alphabet.indexOf(currentInitials[charIndex]);
-                    currentInitials[charIndex] = alphabet[(idx + 1) % alphabet.length];
-                }
-                if (e.code === 'ArrowDown') {
-                    let idx = alphabet.indexOf(currentInitials[charIndex]);
-                    currentInitials[charIndex] = alphabet[(idx - 1 + alphabet.length) % alphabet.length];
-                }
-                if (e.code === 'Space' || e.code === 'Enter') {
-                    if (charIndex < 2) charIndex++;
-                    else saveScore();
-                }
-                updateInitialsDisplay();
-                return;
+                if (e.code === 'ArrowUp') { let idx = alphabet.indexOf(currentInitials[charIndex]); currentInitials[charIndex] = alphabet[(idx + 1) % alphabet.length]; }
+                if (e.code === 'ArrowDown') { let idx = alphabet.indexOf(currentInitials[charIndex]); currentInitials[charIndex] = alphabet[(idx - 1 + alphabet.length) % alphabet.length]; }
+                if (e.code === 'Space' || e.code === 'Enter') { if (charIndex < 2) charIndex++; else saveScore(); }
+                updateInitialsDisplay(); return;
             }
-
-            if (e.code === 'Space' && gameActive) jumpBuffer = 200; // 200ms buffer
+            if (e.code === 'Space' && gameActive) jumpBuffer = 200;
             if (e.code === 'ArrowDown' && gameActive) player.isDucking = true;
             if (e.code === 'KeyE') extract();
-            if (e.code === 'KeyR' && !gameActive && !enteringScore) {
-                initLevel();
-            }
+            if (e.code === 'KeyR' && (!gameActive || !showLeaderboard) && !enteringScore) initLevel();
         });
-
-        window.addEventListener('keyup', e => {
-            keys[e.code] = false;
-            if (e.code === 'ArrowDown') player.isDucking = false;
-            if (e.code === 'Space' && player.vy < -5) player.vy *= 0.5; // Variable jump height
-        });
-
+        window.addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'ArrowDown') player.isDucking = false; if (e.code === 'Space' && player.vy < -5) player.vy *= 0.5; });
         canvas.addEventListener('mousedown', e => {
             if (!gameActive || enteringScore) return;
-            const rect = canvas.getBoundingClientRect();
-            const targetX = e.clientX - rect.left;
-            const targetY = e.clientY - rect.top;
-
-            let validTarget = false;
-            for (let p of platforms) {
-                if (targetX >= p.x && targetX <= p.x + p.w && targetY >= p.y && targetY <= p.y + p.h) {
-                    validTarget = true;
-                    break;
-                }
-            }
-
-            if (validTarget) {
-                player.hook.x = targetX;
-                player.hook.y = targetY;
-                const dx = (player.x + player.w/2) - targetX;
-                const dy = (player.y + player.h/2) - targetY;
-                player.hook.length = Math.sqrt(dx*dx + dy*dy);
-                player.hook.active = true;
-                player.vy -= 2; // Initial tug
-            }
+            const r = canvas.getBoundingClientRect(); const tX = e.clientX - r.left; const tY = e.clientY - r.top;
+            let v = false; for (let p of platforms) if (tX >= p.x && tX <= p.x + p.w && tY >= p.y && tY <= p.y + p.h) { v = true; break; }
+            if (v) { player.hook.x = tX; player.hook.y = tY; const dx = (player.x + player.w/2) - tX, dy = (player.y + player.h/2) - tY; player.hook.length = Math.sqrt(dx*dx + dy*dy); player.hook.active = true; player.vy -= 1.5; }
         });
-
-        canvas.addEventListener('mouseup', () => {
-            player.hook.active = false;
-        });
-
-        requestAnimationFrame(loop);
-        initLevel();
+        canvas.addEventListener('mouseup', () => player.hook.active = false);
+        for(let i=0; i<3; i++) for(let j=0; j<12; j++) bgLayers[i].elements.push({ x: j * (canvas.width/6) + Math.random() * 50, y: 50 + Math.random() * 350, w: 20 + Math.random() * 80, h: 100 + Math.random() * 500 });
+        fetchScores(); requestAnimationFrame(loop);
     </script>
 </body>
 </html>
