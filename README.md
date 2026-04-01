@@ -1,2 +1,2 @@
-# exob-rn
+# Exobörn
 Infinite runner
