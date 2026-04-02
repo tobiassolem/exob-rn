@@ -43,8 +43,8 @@
         <p style="font-size: 8px; margin-top: 50px; color: var(--retro-dim);">[UP/DOWN] CYCLE | [SPACE] LOCK</p>
     </div>
     <div class="controls">
-        <span style="color: var(--retro-yellow)">SPACE:</span> JUMP | <span style="color: var(--retro-yellow)">DOWN:</span> DUCK | <span style="color: var(--retro-yellow)">CLICK PLATFORM:</span> GRAPPLE <br>
-        <span style="color: var(--retro-yellow)">E:</span> EXTRACT ($5000+) | <span style="color: var(--retro-yellow)">R:</span> DEPLOY
+        <span style="color: var(--retro-yellow)">SPACE:</span> JUMP | <span style="color: var(--retro-yellow)">LEFT/RIGHT:</span> MOVE | <span style="color: var(--retro-yellow)">DOWN:</span> DUCK/SLIDE | <span style="color: var(--retro-yellow)">CLICK PLATFORM:</span> GRAPPLE <br>
+        <span style="color: var(--retro-yellow)">UP/DOWN (HOOKED):</span> REEL IN/OUT | <span style="color: var(--retro-yellow)">E:</span> EXTRACT ($5000+) | <span style="color: var(--retro-yellow)">R:</span> DEPLOY
     </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -163,21 +163,27 @@
         let charIndex = 0;
         const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?#";
 
-        const GRAVITY = 0.55;
+        const GRAVITY = 0.52;
         const JUMP_POWER = -12.5;
-        const AIR_FRICTION = 0.988;
+        const AIR_FRICTION = 0.992;
         const GROUND_FRICTION = 0.84;
-        const SWING_BOOST = 0.35;
-        
+        const SWING_BOOST = 0.55;
+        const HOOK_MAX_LENGTH = 300;
+        const HOOK_REEL_SPEED = 1.5;
+        const HOOK_DAMPING = 0.995;
+
         let coyoteTime = 0;
         let jumpBuffer = 0;
+        let nearMissTimer = 0;
+        let difficultyWave = 0;
+        let safeZoneCounter = 0;
 
         const player = {
             x: 150, y: 250, w: 24, h: 44,
-            vx: 0, vy: 0, 
+            vx: 0, vy: 0,
             isGrounded: false,
             isDucking: false,
-            hook: { active: false, x: 0, y: 0, length: 0 }
+            hook: { active: false, x: 0, y: 0, length: 0, anchorPlatform: null }
         };
 
         let bgLayers = [
@@ -235,43 +241,83 @@
         function initLevel() {
             initAudio();
             platforms = [{ x: 0, y: 450, w: 1200, h: 50 }];
-            lastPlatformEndX = 1200;
+            lastPlatformEndX = 1200; lastPlatformY = 450;
             items = []; obstacles = [];
             player.x = 150; player.y = 250; player.vx = 0; player.vy = 0;
-            player.hook.active = false; wallet = 0;
+            player.hook.active = false; player.hook.anchorPlatform = null;
+            player.isDucking = false; wallet = 0;
+            nearMissTimer = 0; difficultyWave = 0; safeZoneCounter = 0; frameCount = 0;
+            keys = {};
             scrollSpeed = baseSpeed; updateUI();
             gameActive = true; enteringScore = false; showLeaderboard = false;
             msgEl.style.display = "none"; initialsOverlay.style.display = "none";
             lastTime = performance.now();
         }
 
-        function updateUI() {
-            currentEl.innerText = wallet;
-            bankEl.innerText = bank;
-            scrollSpeed = gameActive ? baseSpeed + (wallet / 4000) : baseSpeed;
+        function formatScore(n) {
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+            if (n >= 100000) return (n / 1000).toFixed(0) + 'K';
+            return n.toLocaleString();
         }
+
+        function updateUI() {
+            currentEl.innerText = formatScore(wallet);
+            bankEl.innerText = formatScore(bank);
+            // Logarithmic speed curve with cap — collecting loot ramps difficulty gently, not punitively
+            const rawBoost = Math.log2(1 + wallet / 3000) * 1.8;
+            const maxBoost = 4.5;
+            scrollSpeed = gameActive ? baseSpeed + Math.min(rawBoost, maxBoost) : baseSpeed;
+        }
+
+        let lastPlatformY = 450;
 
         function spawnEntities() {
             frameCount++;
-            const diff = Math.min(1.5, (scrollSpeed - baseSpeed) / 5);
+            difficultyWave = 0.5 + 0.5 * Math.sin(frameCount * 0.003); // oscillates 0..1
+            const diff = Math.min(1.2, (scrollSpeed - baseSpeed) / 6);
+            const waveDiff = diff * (0.4 + 0.6 * difficultyWave); // difficulty breathes
+
             if (lastPlatformEndX < canvas.width + 500) {
-                const gap = 80 + Math.random() * 220 * (1 + diff);
-                const w = 250 + Math.random() * 600;
-                platforms.push({ x: lastPlatformEndX + gap, y: 400 + Math.random() * 70, w: w, h: 100 });
-                lastPlatformEndX = lastPlatformEndX + gap + w;
+                safeZoneCounter++;
+                // Cap gap to what's physically jumpable (jump covers ~200px horizontal at max speed)
+                const maxGap = 160 + 60 * waveDiff;
+                const minGap = 60;
+                const gap = minGap + Math.random() * (maxGap - minGap);
+                // Constrain height relative to previous platform (max 60px change, reachable by jump)
+                const heightDelta = (Math.random() - 0.45) * 60;
+                const newY = Math.max(340, Math.min(470, lastPlatformY + heightDelta));
+                // Minimum width scales down gently with difficulty, but stays usable
+                const minW = Math.max(150, 250 - waveDiff * 80);
+                const w = minW + Math.random() * 400;
+                // Every 5th platform is a safe zone (wide, stable)
+                const isSafe = safeZoneCounter % 5 === 0;
+                const finalW = isSafe ? Math.max(w, 400) : w;
+
+                platforms.push({ x: lastPlatformEndX + gap, y: newY, w: finalW, h: 100 });
+                lastPlatformEndX = lastPlatformEndX + gap + finalW;
+                lastPlatformY = newY;
             }
-            if (frameCount % 110 === 0) platforms.push({ x: canvas.width, y: 100 + Math.random() * 200, w: 120, h: 20 });
-            if (frameCount % 60 === 0) {
+            // Floating platforms — spawn relative to nearby ground level, always reachable
+            if (frameCount % 100 === 0) {
+                const floatY = Math.max(80, lastPlatformY - 140 - Math.random() * 120);
+                platforms.push({ x: canvas.width, y: floatY, w: 100 + Math.random() * 60, h: 20 });
+            }
+            if (frameCount % 55 === 0) {
                 const luck = Math.random();
                 if (luck > 0.94) {
-                    items.push({ x: canvas.width, y: 40 + Math.random() * 80, w: 22, h: 22, val: 7500, tier: 3 });
-                    obstacles.push({ x: canvas.width + 40, y: 40 + Math.random() * 80, w: 35, h: 35 });
-                } else if (luck > 0.75) {
-                    items.push({ x: canvas.width, y: 160 + Math.random() * 120, w: 18, h: 18, val: 2500, tier: 2 });
-                } else if (luck > 0.4) {
-                    items.push({ x: canvas.width, y: 320 + Math.random() * 80, w: 15, h: 15, val: 500, tier: 1 });
+                    const ty = 40 + Math.random() * 80;
+                    items.push({ x: canvas.width, y: ty, w: 22, h: 22, val: 7500, tier: 3 });
+                    obstacles.push({ x: canvas.width + 40, y: ty + (Math.random() - 0.5) * 30, w: 35, h: 35 });
+                } else if (luck > 0.72) {
+                    items.push({ x: canvas.width, y: 140 + Math.random() * 120, w: 18, h: 18, val: 2500, tier: 2 });
+                } else if (luck > 0.35) {
+                    items.push({ x: canvas.width, y: 280 + Math.random() * 100, w: 15, h: 15, val: 500, tier: 1 });
                 }
-                if (Math.random() < 0.3 + diff) obstacles.push({ x: canvas.width, y: 100 + Math.random() * 300, w: 40, h: 40 });
+                // Obstacles scale with difficulty wave — breather moments have fewer obstacles
+                if (Math.random() < 0.2 + waveDiff * 0.4) {
+                    const oy = 100 + Math.random() * 280;
+                    obstacles.push({ x: canvas.width, y: oy, w: 30 + waveDiff * 15, h: 30 + waveDiff * 15 });
+                }
             }
         }
 
@@ -291,23 +337,62 @@
             items.forEach(i => i.x -= scrollSpeed * scalar);
             obstacles.forEach(o => o.x -= scrollSpeed * scalar);
             if (player.hook.active) {
-                player.hook.x -= scrollSpeed * scalar;
-                const dx = (player.x + player.w/2) - player.hook.x;
-                const dy = (player.y + player.h/2) - player.hook.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist > player.hook.length) {
-                    const nx = dx / dist, ny = dy / dist;
-                    player.x = player.hook.x + nx * player.hook.length - player.w/2;
-                    player.y = player.hook.y + ny * player.hook.length - player.h/2;
-                    const dot = player.vx * nx + player.vy * ny;
-                    if (dot > 0) { player.vx -= dot * nx; player.vy -= dot * ny; }
-                    if (keys['ArrowRight'] || keys['KeyD']) player.vx += SWING_BOOST * scalar;
-                    if (keys['ArrowLeft'] || keys['KeyA']) player.vx -= SWING_BOOST * scalar;
+                // Anchor moves with its platform (not raw scroll) for stability
+                const ap = player.hook.anchorPlatform;
+                if (ap) {
+                    player.hook.x = ap.x + player.hook.anchorOffsetX;
+                    player.hook.y = ap.y;
                 }
+                // Reel in when holding up, reel out when holding down
+                if (keys['ArrowUp'] || keys['KeyW']) player.hook.length = Math.max(60, player.hook.length - HOOK_REEL_SPEED * scalar);
+                if (keys['ArrowDown'] || keys['KeyS']) player.hook.length = Math.min(HOOK_MAX_LENGTH, player.hook.length + HOOK_REEL_SPEED * scalar);
+
+                const cx = player.x + player.w / 2, cy = player.y + player.h / 2;
+                const dx = cx - player.hook.x, dy = cy - player.hook.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist > player.hook.length) {
+                    // Rope is taut — apply pendulum constraint
+                    const nx = dx / dist, ny = dy / dist;
+                    // Project position back onto rope circle
+                    player.x = player.hook.x + nx * player.hook.length - player.w / 2;
+                    player.y = player.hook.y + ny * player.hook.length - player.h / 2;
+                    // Remove radial velocity component, preserve tangential (pendulum swing)
+                    const radialV = player.vx * nx + player.vy * ny;
+                    if (radialV > 0) {
+                        player.vx -= radialV * nx;
+                        player.vy -= radialV * ny;
+                    }
+                    // Add tangential swing force from input
+                    const tx = -ny, ty = nx; // tangent vector (perpendicular to rope)
+                    if (keys['ArrowRight'] || keys['KeyD']) { player.vx += tx * SWING_BOOST * scalar; player.vy += ty * SWING_BOOST * scalar; }
+                    if (keys['ArrowLeft'] || keys['KeyA']) { player.vx -= tx * SWING_BOOST * scalar; player.vy -= ty * SWING_BOOST * scalar; }
+                }
+                // Gentle damping to prevent wild oscillations
+                player.vx *= Math.pow(HOOK_DAMPING, scalar);
+                player.vy *= Math.pow(HOOK_DAMPING, scalar);
+
+                // Detach if anchor platform scrolled off screen
+                if (ap && ap.x + ap.w < -50) player.hook.active = false;
             }
-            player.vx *= Math.pow(player.isGrounded ? GROUND_FRICTION : AIR_FRICTION, scalar);
-            if (!player.hook.active) player.vx += (150 - player.x) * 0.015 * scalar;
+            // Player horizontal movement — ground has full authority, air has reduced control
+            if (!player.hook.active) {
+                const moveForce = (player.isGrounded || coyoteTime > 0) ? 0.6 : 0.3;
+                if (keys['ArrowRight'] || keys['KeyD']) player.vx += moveForce * scalar;
+                if (keys['ArrowLeft'] || keys['KeyA']) player.vx -= moveForce * scalar;
+                // Duck-slide: ducking on ground gives a speed burst
+                if (player.isDucking && player.isGrounded && Math.abs(player.vx) > 0.5) player.vx *= 1.01;
+            }
+            // Friction: hook has its own damping, don't double-apply
+            if (!player.hook.active) {
+                player.vx *= Math.pow(player.isGrounded ? GROUND_FRICTION : AIR_FRICTION, scalar);
+            }
+            // Soft auto-centering — only when player isn't actively moving or hooked, and gentler
+            if (!player.hook.active && !keys['ArrowRight'] && !keys['KeyD'] && !keys['ArrowLeft'] && !keys['KeyA']) {
+                player.vx += (150 - player.x) * 0.006 * scalar;
+            }
             player.x += player.vx * scalar; player.y += player.vy * scalar;
+            if (nearMissTimer > 0) nearMissTimer -= dt;
             player.isGrounded = false;
             let pH = player.isDucking ? player.h / 2 : player.h;
             let pT = player.isDucking ? player.y + player.h / 2 : player.y;
@@ -326,7 +411,18 @@
             if (player.x < 0) { player.x = 0; player.vx = 0; }
             if (player.x + player.w > canvas.width) { player.x = canvas.width - player.w; player.vx = 0; }
             if (player.y > canvas.height) gameOver();
-            for (let o of obstacles) if (player.x < o.x + o.w && player.x + player.w > o.x && pT < o.y + o.h && pT + pH > o.y) gameOver();
+            for (let o of obstacles) {
+                if (player.x < o.x + o.w && player.x + player.w > o.x && pT < o.y + o.h && pT + pH > o.y) { gameOver(); break; }
+                // Near-miss detection — reward close calls with brief visual juice
+                const nearPad = 12;
+                if (nearMissTimer <= 0 && player.x < o.x + o.w + nearPad && player.x + player.w + nearPad > o.x && pT < o.y + o.h + nearPad && pT + pH + nearPad > o.y) {
+                    if (!(player.x < o.x + o.w && player.x + player.w > o.x && pT < o.y + o.h && pT + pH > o.y)) {
+                        nearMissTimer = 400; // 400ms of "close call" visual feedback
+                        wallet += 100; // small reward for skillful play
+                        updateUI();
+                    }
+                }
+            }
             for (let i of items) if (!i.collected && player.x < i.x + i.w && player.x + player.w > i.x && pT < i.y + i.h && pT + pH > i.y) {
                 i.collected = true; wallet += i.val; updateUI();
                 if (i.tier === 1) sfx.loot1(); else if (i.tier === 2) sfx.loot2(); else sfx.loot3();
@@ -361,10 +457,16 @@
                     ctx.beginPath(); ctx.moveTo(player.x + player.w / 2, player.y + 10); ctx.lineTo(player.hook.x, player.hook.y); ctx.stroke();
                     ctx.setLineDash([]); ctx.fillStyle = "#fff"; ctx.fillRect(player.hook.x-5, player.hook.y-5, 10, 10);
                 }
-                ctx.fillStyle = player.isDucking ? "#886000" : "#ffb000";
+                ctx.fillStyle = nearMissTimer > 0 ? "#ffffff" : (player.isDucking ? "#886000" : "#ffb000");
                 let dH = player.isDucking ? player.h / 2 : player.h, dY = player.isDucking ? player.y + player.h / 2 : player.y;
                 ctx.fillRect(player.x, dY, player.w, dH);
                 ctx.fillStyle = "#fff"; ctx.fillRect(player.x + (player.vx > 0 ? 16 : 4), dY + 6, 5, 5);
+                // Near-miss flash
+                if (nearMissTimer > 0) {
+                    ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = "#fff"; ctx.font = "8px 'Press Start 2P'"; ctx.textAlign = "center";
+                    ctx.fillText("CLOSE CALL +$100", player.x + player.w / 2, dY - 10);
+                }
             }
             if (showLeaderboard && !enteringScore) {
                 ctx.fillStyle = "rgba(5, 4, 0, 0.9)"; ctx.fillRect(250, 60, 500, 380);
@@ -380,19 +482,20 @@
                 else {
                     highScores.forEach((s, i) => {
                         ctx.textAlign = "left"; ctx.fillText(`${(i+1).toString().padStart(2, '0')} ${s.name}`, 300, 160 + i * 26);
-                        ctx.textAlign = "right"; ctx.fillText(`$${s.score.toLocaleString()}`, 700, 160 + i * 26);
+                        ctx.textAlign = "right"; ctx.fillText(`$${formatScore(s.score)}`, 700, 160 + i * 26);
                     });
                 }
                 if (!gameActive) { ctx.textAlign = "center"; ctx.fillStyle = "#fff5e0"; ctx.fillText("PRESS [R] TO DEPLOY", 500, 410); }
             }
         }
 
-        function loop(time) { const dt = time - lastTime; lastTime = time; update(dt); draw(); animationFrameId = requestAnimationFrame(loop); }
+        function loop(time) { const dt = Math.min(time - lastTime, 50); lastTime = time; update(dt); draw(); animationFrameId = requestAnimationFrame(loop); }
         function gameOver() { if (!gameActive) return; gameActive = false; sfx.death(); checkHighScore(); if (!enteringScore) { showMsg("<span style='color:#ff5500; font-size: 16px;'>SYSTEM FAILURE</span><br><br>Unit destroyed. Data scrubbed.<br><br>[R] TO REBOOT"); showLeaderboard = true; fetchScores(); } }
         function extract() { if (wallet >= 5000 && gameActive) { bank += (wallet - 500); let f = wallet; wallet = 0; sfx.win(); updateUI(); gameActive = false; checkHighScore(f); if (!enteringScore) { showMsg("<span style='color:#ffb000; font-size: 16px;'>EXTRACTION COMPLETE</span><br><br>Security fee: $500.<br><br>[R] FOR NEW DROP"); showLeaderboard = true; fetchScores(); } } }
-        function checkHighScore(s = wallet) { if (s > 0 && (highScores.length < 10 || s > highScores[highScores.length - 1]?.score)) { enteringScore = true; initialsOverlay.style.display = "block"; charIndex = 0; updateInitialsDisplay(); } }
+        let pendingScore = 0;
+        function checkHighScore(s = wallet) { pendingScore = s; if (s > 0 && (highScores.length < 10 || s > highScores[highScores.length - 1]?.score)) { enteringScore = true; initialsOverlay.style.display = "block"; charIndex = 0; updateInitialsDisplay(); } }
         function updateInitialsDisplay() { for(let i=0; i<3; i++) { const el = document.getElementById('l' + i); el.innerText = currentInitials[i]; el.classList.toggle('active', i === charIndex); } }
-        async function saveScore() { const n = currentInitials.join(''); const s = wallet || (bank + 500); await submitScore(n, s); enteringScore = false; initialsOverlay.style.display = "none"; showLeaderboard = true; showMsg("<span style='color:#ffb000;'>DATA ARCHIVED</span><br><br>Operative " + n + " logged.<br><br>[R] TO REBOOT"); }
+        async function saveScore() { const n = currentInitials.join(''); await submitScore(n, pendingScore); enteringScore = false; initialsOverlay.style.display = "none"; showLeaderboard = true; showMsg("<span style='color:#ffb000;'>DATA ARCHIVED</span><br><br>Operative " + n + " logged.<br><br>[R] TO REBOOT"); }
         function showMsg(t) { msgEl.innerHTML = t; msgEl.style.display = "block"; }
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
@@ -403,16 +506,34 @@
                 updateInitialsDisplay(); return;
             }
             if (e.code === 'Space' && gameActive) jumpBuffer = 200;
-            if (e.code === 'ArrowDown' && gameActive) player.isDucking = true;
+            if (e.code === 'ArrowDown' && gameActive && !player.hook.active) player.isDucking = true;
             if (e.code === 'KeyE') extract();
             if (e.code === 'KeyR' && (!gameActive || !showLeaderboard) && !enteringScore) initLevel();
         });
         window.addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'ArrowDown') player.isDucking = false; if (e.code === 'Space' && player.vy < -5) player.vy *= 0.5; });
         canvas.addEventListener('mousedown', e => {
             if (!gameActive || enteringScore) return;
-            const r = canvas.getBoundingClientRect(); const tX = e.clientX - r.left; const tY = e.clientY - r.top;
-            let v = false; for (let p of platforms) if (tX >= p.x && tX <= p.x + p.w && tY >= p.y && tY <= p.y + p.h) { v = true; break; }
-            if (v) { sfx.hook(); player.hook.x = tX; player.hook.y = tY; const dx = (player.x + player.w/2) - tX, dy = (player.y + player.h/2) - tY; player.hook.length = Math.sqrt(dx*dx + dy*dy); player.hook.active = true; player.vy -= 1.5; }
+            const r = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / r.width, scaleY = canvas.height / r.height;
+            const tX = (e.clientX - r.left) * scaleX, tY = (e.clientY - r.top) * scaleY;
+            let targetPlatform = null;
+            for (let p of platforms) {
+                if (tX >= p.x && tX <= p.x + p.w && tY >= p.y && tY <= p.y + p.h) { targetPlatform = p; break; }
+            }
+            if (targetPlatform) {
+                sfx.hook();
+                // Anchor to the top edge of the platform at click X
+                const anchorX = tX;
+                const anchorY = targetPlatform.y;
+                player.hook.x = anchorX;
+                player.hook.y = anchorY;
+                player.hook.anchorPlatform = targetPlatform;
+                player.hook.anchorOffsetX = anchorX - targetPlatform.x;
+                const dx = (player.x + player.w / 2) - anchorX, dy = (player.y + player.h / 2) - anchorY;
+                player.hook.length = Math.min(Math.sqrt(dx * dx + dy * dy), HOOK_MAX_LENGTH);
+                player.hook.active = true;
+                // No arbitrary impulse — the pendulum physics handle momentum naturally
+            }
         });
         canvas.addEventListener('mouseup', () => player.hook.active = false);
         for(let i=0; i<3; i++) for(let j=0; j<12; j++) bgLayers[i].elements.push({ x: j * (canvas.width/6) + Math.random() * 50, y: 50 + Math.random() * 350, w: 20 + Math.random() * 80, h: 100 + Math.random() * 500 });

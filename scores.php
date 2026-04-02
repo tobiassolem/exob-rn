@@ -22,20 +22,30 @@ $options = [
 try {
     $pdo = new PDO($dsn, $user, $pass, $options);
     
-    // 3. Ensure table exists
+    // 3. Ensure table exists (BIGINT for scores above 1M)
     $pdo->exec("CREATE TABLE IF NOT EXISTS high_scores (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name CHAR(3) NOT NULL,
-        score INT NOT NULL,
+        score BIGINT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
+
+    // Migrate existing INT column to BIGINT if needed (one-time, checks first)
+    $colType = $pdo->query("SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='$db' AND TABLE_NAME='high_scores' AND COLUMN_NAME='score'")->fetchColumn();
+    if ($colType && strtolower($colType) !== 'bigint') {
+        $pdo->exec("ALTER TABLE high_scores MODIFY COLUMN score BIGINT NOT NULL");
+    }
 
     // 4. Handle New Submissions
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data = json_decode(file_get_contents('php://input'), true);
         if ($data && !empty($data['name'])) {
-            $stmt = $pdo->prepare("INSERT INTO high_scores (name, score) VALUES (?, ?)");
-            $stmt->execute([strtoupper(substr($data['name'], 0, 3)), (int)$data['score']]);
+            $name = preg_replace('/[^A-Z0-9!?#]/', '', strtoupper(substr($data['name'], 0, 3)));
+            $score = max(0, min(999999999, (int)$data['score'])); // cap at ~1B to prevent abuse
+            if (strlen($name) === 3 && $score > 0) {
+                $stmt = $pdo->prepare("INSERT INTO high_scores (name, score) VALUES (?, ?)");
+                $stmt->execute([$name, $score]);
+            }
         }
     }
 
