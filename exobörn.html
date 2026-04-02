@@ -387,9 +387,10 @@
             if (!player.hook.active) {
                 player.vx *= Math.pow(player.isGrounded ? GROUND_FRICTION : AIR_FRICTION, scalar);
             }
-            // Soft auto-centering — only when player isn't actively moving or hooked, and gentler
-            if (!player.hook.active && !keys['ArrowRight'] && !keys['KeyD'] && !keys['ArrowLeft'] && !keys['KeyA']) {
-                player.vx += (150 - player.x) * 0.006 * scalar;
+            // Soft auto-centering — only when grounded, idle, and far from center
+            const driftFromCenter = 150 - player.x;
+            if (!player.hook.active && player.isGrounded && !keys['ArrowRight'] && !keys['KeyD'] && !keys['ArrowLeft'] && !keys['KeyA'] && Math.abs(driftFromCenter) > 40) {
+                player.vx += driftFromCenter * 0.003 * scalar;
             }
             player.x += player.vx * scalar; player.y += player.vy * scalar;
             if (nearMissTimer > 0) nearMissTimer -= dt;
