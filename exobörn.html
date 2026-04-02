@@ -43,8 +43,8 @@
         <p style="font-size: 8px; margin-top: 50px; color: var(--retro-dim);">[UP/DOWN] CYCLE | [SPACE] LOCK</p>
     </div>
     <div class="controls">
-        <span style="color: var(--retro-yellow)">SPACE:</span> JUMP | <span style="color: var(--retro-yellow)">LEFT/RIGHT:</span> MOVE | <span style="color: var(--retro-yellow)">DOWN:</span> DUCK/SLIDE | <span style="color: var(--retro-yellow)">CLICK PLATFORM:</span> GRAPPLE <br>
-        <span style="color: var(--retro-yellow)">UP/DOWN (HOOKED):</span> REEL IN/OUT | <span style="color: var(--retro-yellow)">E:</span> EXTRACT ($5000+) | <span style="color: var(--retro-yellow)">R:</span> DEPLOY
+        <span style="color: var(--retro-yellow)">W/SPACE/UP:</span> JUMP | <span style="color: var(--retro-yellow)">A/D or LEFT/RIGHT:</span> MOVE | <span style="color: var(--retro-yellow)">S/DOWN:</span> DUCK/SLIDE | <span style="color: var(--retro-yellow)">CLICK PLATFORM:</span> GRAPPLE <br>
+        <span style="color: var(--retro-yellow)">W/S (HOOKED):</span> REEL IN/OUT | <span style="color: var(--retro-yellow)">E:</span> EXTRACT ($5000+) | <span style="color: var(--retro-yellow)">R:</span> DEPLOY
     </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -506,12 +506,12 @@
                 if (e.code === 'Space' || e.code === 'Enter') { if (charIndex < 2) charIndex++; else saveScore(); }
                 updateInitialsDisplay(); return;
             }
-            if (e.code === 'Space' && gameActive) jumpBuffer = 200;
-            if (e.code === 'ArrowDown' && gameActive && !player.hook.active) player.isDucking = true;
+            if ((e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') && gameActive) jumpBuffer = 200;
+            if ((e.code === 'ArrowDown' || e.code === 'KeyS') && gameActive && !player.hook.active) player.isDucking = true;
             if (e.code === 'KeyE') extract();
             if (e.code === 'KeyR' && (!gameActive || !showLeaderboard) && !enteringScore) initLevel();
         });
-        window.addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'ArrowDown') player.isDucking = false; if (e.code === 'Space' && player.vy < -5) player.vy *= 0.5; });
+        window.addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'ArrowDown' || e.code === 'KeyS') player.isDucking = false; if ((e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') && player.vy < -5) player.vy *= 0.5; });
         canvas.addEventListener('mousedown', e => {
             if (!gameActive || enteringScore) return;
             const r = canvas.getBoundingClientRect();
