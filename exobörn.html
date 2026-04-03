@@ -33,25 +33,84 @@
             --tier-3: var(--c64-purple);
             --extract-ready: var(--c64-light-green);
         }
-        body { 
-            background: var(--c64-light-blue); 
-            color: var(--c64-light-blue); 
-            font-family: 'Press Start 2P', cursive; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
-            margin: 0; 
-            overflow: hidden; 
-        }
-        #monitor-frame {
-            background: var(--c64-light-blue);
-            padding: 40px;
-            border: 20px solid #a5a5a5;
-            box-shadow: inset 0 0 50px rgba(0,0,0,0.5), 0 20px 50px rgba(0,0,0,0.8);
-            position: relative;
-        }
+            body { 
+                /* The foundation, fallback, and image loading */
+                background: var(--c64-light-blue) url("background.jpg") center / cover no-repeat; 
+
+
+                /* Existing layout parameters */
+                color: var(--c64-dark-blue); /* Proactive correction */
+                font-family: 'Press Start 2P', cursive; 
+                display: flex; 
+                flex-direction: column; 
+                align-items: center; 
+                justify-content: center; 
+                height: 100vh; 
+                margin: 0; 
+                overflow: hidden; 
+            }
+#monitor-frame {
+    /* 1. THE PLASTIC COLOR - Darkened for better framing */
+    --c64-beige: #a09580;       /* Aged, grittier industrial plastic */
+    --c64-dark-trim: #4a453a;   /* Hard shadow for depth */
+    
+    background-color: var(--c64-beige);
+    position: relative;
+    padding: 45px; 
+    border-radius: 70px / 45px; 
+    border: none;
+    
+    /* 3D BEVEL OVERHAUL */
+    box-shadow: 
+        /* Hard top highlight to define the upper "shelf" */
+        inset 0 8px 10px rgba(255,255,255,0.25),
+        
+        /* Deep recess where the screen meets the casing */
+        inset 0 0 60px rgba(0,0,0,0.8), 
+        
+        /* Simulating the physical lip of the monitor */
+        inset 0 0 0 10px var(--c64-beige),
+        inset 0 0 0 14px var(--c64-dark-trim),
+        
+        /* Outer frame boundary */
+        0 0 0 2px #333,
+        
+        /* Heavy drop shadow to "ground" the unit against the background */
+        0 25px 50px rgba(0,0,0,0.9);
+    
+    background-image: radial-gradient(
+        circle at 50% 10%, 
+        rgba(255,255,255,0.1) 0%, 
+        transparent 70%
+    );
+}
+
+/* THE SCREEN INTERFACE - Pushing the Contrast */
+#monitor-frame .content-wrapper {
+    position: relative;
+    background: #050508; /* Near-pure black for maximum contrast */
+    border-radius: 40px / 20px;
+    overflow: hidden;
+    border: 6px solid #1a1a1a; /* The "seal" around the glass */
+    
+    /* High-contrast text defaults */
+    color: #00ffff; /* Cyber-cyan */
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+}
+
+/* Glass Bulge & Scanline Simulation */
+#monitor-frame .content-wrapper::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    /* Subtle scanline texture and glass vignette */
+    background: 
+        linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%),
+        radial-gradient(rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.5));
+    background-size: 100% 3px, 100% 100%;
+    pointer-events: none;
+    z-index: 10;
+}
         #ui { 
             width: 1000px; 
             display: flex; 
@@ -69,7 +128,6 @@
         }
         canvas { 
             background: var(--c64-blue); 
-            image-rendering: pixelated; 
             width: 1000px;
             height: 500px;
             cursor: none; /* Hardware cursor suppression */
@@ -145,7 +203,7 @@
     <div id="monitor-frame">
         <div id="ui">
             <div>ARCHIVE: $<span id="bank">0</span></div>
-            <div style="color: var(--c64-white); font-weight: bold; letter-spacing: 4px;">EXOBÖRN</div>
+            <div style="color: var(--c64-light-blue); font-weight: bold; letter-spacing: 4px;">EXOBÖRN BY TOBIAS SOLEM</div>
             <div>BUFFER: $<span id="current">0</span></div>
         </div>
         <div id="sys-monitor" style="width: 1000px; display: flex; justify-content: flex-end; margin-bottom: 10px; font-size: 10px; color: var(--c64-blue); font-weight: bold;">
@@ -181,7 +239,7 @@
     </div>
     <div class="controls">
         <span style="color: var(--retro-yellow)">W/SPACE/UP:</span> JUMP | <span style="color: var(--retro-yellow)">A/D or LEFT/RIGHT:</span> MOVE | <span style="color: var(--retro-yellow)">S/DOWN:</span> DUCK/SLIDE | <span style="color: var(--retro-yellow)">CLICK PLATFORM:</span> GRAPPLE <br>
-        <span style="color: var(--retro-yellow)">W/S (HOOKED):</span> REEL IN/OUT | <span style="color: var(--retro-yellow)">E:</span> UPLINK DATA ($2000+) | <span style="color: var(--retro-yellow)">R:</span> SHOP/AUGMENT
+        <span style="color: var(--retro-yellow)">W/S (HOOKED):</span> REEL IN/OUT | <span style="color: var(--retro-yellow)">E:</span> EXTRACT ($2000+) | <span style="color: var(--retro-yellow)">R:</span> SHOP/AUGMENT
     </div>
     <script type="module">
         import { SidPlayer } from './sidplayer.js';
@@ -708,18 +766,39 @@ function spawnEntities() {
         }
     }
 
-    // Item & Obstacle Generation (Unchanged)
+    // --- Strategic Resource Allocation ---
     if (frameCount % 55 === 0) {
         const luck = Math.random();
-        let sx = canvas.width, sy = 100 + Math.random() * 300;
-        if (currentLevel.id !== 0) {
-            sx = 100 + Math.random() * (canvas.width - 200);
-            sy = currentLevel.id === 1 ? -50 : canvas.height + 50;
+        let sx = canvas.width;
+        let sy = 0;
+        let tier = 0;
+        let val = 0;
+        let size = 0;
+
+        // Establish rarity thresholds
+        if (luck > 0.95) { tier = 3; val = 7500; size = 22; }      // 5% chance
+        else if (luck > 0.75) { tier = 2; val = 2500; size = 18; } // 20% chance
+        else if (luck > 0.30) { tier = 1; val = 500; size = 15; }  // 45% chance
+
+        if (tier > 0) {
+            if (currentLevel.id === 0) {
+                // Bind elevation to economic tier
+                if (tier === 3) {
+                    sy = 30 + Math.random() * 50;        // Stratosphere (Y: 30-80)
+                } else if (tier === 2) {
+                    sy = 100 + Math.random() * 120;      // Upper Canopy (Y: 100-220)
+                } else {
+                    sy = 200 + Math.random() * 220;      // Low altitude/Ground (Y: 200-420)
+                }
+            } else {
+                // Vertical sectors utilise horizontal variance
+                sx = 100 + Math.random() * (canvas.width - 200);
+                sy = currentLevel.id === 1 ? -50 : canvas.height + 50;
+            }
+            items.push({ x: sx, y: sy, w: size, h: size, val: val, tier: tier });
         }
-        if (luck > 0.94) items.push({ x: sx, y: sy, w: 22, h: 22, val: 7500, tier: 3 });
-        else if (luck > 0.72) items.push({ x: sx, y: sy, w: 18, h: 18, val: 2500, tier: 2 });
-        else if (luck > 0.35) items.push({ x: sx, y: sy, w: 15, h: 15, val: 500, tier: 1 });
         
+        // --- Hazard Generation ---
         if (Math.random() < 0.2 + waveDiff * 0.4) {
             const ox = currentLevel.id === 0 ? canvas.width : 50 + Math.random() * (canvas.width-100);
             const oy = currentLevel.id === 0 ? 100 + Math.random() * 280 : (currentLevel.id === 1 ? -80 : canvas.height + 80);
@@ -929,11 +1008,40 @@ function spawnEntities() {
                     ctx.fillStyle = C64.LIGHT_RED; ctx.fillRect(o.x + 4, o.y + 4, o.w - 8, o.h - 8);
                     if (frameCount % 30 < 15) { ctx.fillStyle = C64.WHITE; ctx.fillRect(o.x + o.w/2 - 2, o.y + 2, 4, o.h - 4); ctx.fillRect(o.x + 2, o.y + o.h/2 - 2, o.w - 4, 4); }
                 });
-                items.forEach(i => {
-                    const color = i.tier === 2 ? C64.CYAN : (i.tier === 3 ? C64.PURPLE : C64.YELLOW);
-                    ctx.fillStyle = C64.BLACK; ctx.fillRect(i.x + 2, i.y + 2, i.w, i.h);
-                    ctx.fillStyle = color; ctx.fillRect(i.x, i.y, i.w, i.h);
-                    ctx.fillStyle = C64.WHITE; ctx.fillRect(i.x + 2, i.y + 2, 4, 4);
+items.forEach(i => {
+                    // --- High-Value Target VFX ---
+                    if (i.tier === 3) {
+                        // Calculate a pulsing wave between 0 and 1
+                        const pulse = Math.abs(Math.sin(frameCount * 0.1));
+                        
+                        // Expand the aura dynamically based on the pulse
+                        const auraSize = i.w + 8 + (pulse * 12);
+                        const offset = (auraSize - i.w) / 2;
+
+                        // Draw the magnetic bleed (Using the RGB equivalent of C64.PURPLE: #8B3F96)
+                        ctx.fillStyle = `rgba(139, 63, 150, ${0.2 + pulse * 0.4})`;
+                        ctx.fillRect(i.x - offset, i.y - offset, auraSize, auraSize);
+                        
+                        // Draw an active white scanline passing over the node
+                        const scanLine = (frameCount * 1.5) % (i.h + 8);
+                        ctx.fillStyle = C64.WHITE;
+                        ctx.fillRect(i.x - 4, (i.y - 4) + scanLine, i.w + 8, 2);
+                    }
+
+                    // --- Standard Geometry Render ---
+                    const colour = i.tier === 2 ? C64.CYAN : (i.tier === 3 ? C64.PURPLE : C64.YELLOW);
+                    
+                    // Drop shadow
+                    ctx.fillStyle = C64.BLACK; 
+                    ctx.fillRect(i.x + 2, i.y + 2, i.w, i.h);
+                    
+                    // Primary chassis
+                    ctx.fillStyle = colour; 
+                    ctx.fillRect(i.x, i.y, i.w, i.h);
+                    
+                    // Specular highlight
+                    ctx.fillStyle = C64.WHITE; 
+                    ctx.fillRect(i.x + 2, i.y + 2, 4, 4);
                 });
                 if (player.hook.active) {
                     ctx.strokeStyle = C64.WHITE; ctx.lineWidth = 4; ctx.beginPath();
@@ -1000,7 +1108,7 @@ if (gameActive && !enteringScore) {
                 ctx.fillStyle = "rgba(0, 0, 170, 0.95)"; ctx.fillRect(200, 40, 600, 420);
                 ctx.strokeStyle = C64.LIGHT_BLUE; ctx.lineWidth = 8; ctx.strokeRect(200, 40, 600, 420);
                 ctx.fillStyle = C64.WHITE; ctx.font = "20px 'Press Start 2P'"; ctx.textAlign = "center";
-                ctx.fillText("COMMODORE ELITE", 500, 100);
+                ctx.fillText("EXOBÖRN ELITE", 500, 100);
                 ctx.font = "12px 'Press Start 2P'";
                 if (leaderboardStatus === "LOADING") ctx.fillText("CONNECTING...", 500, 240);
                 else if (leaderboardStatus === "ERROR") { ctx.fillStyle = C64.RED; ctx.fillText("IO ERROR", 500, 220); }
