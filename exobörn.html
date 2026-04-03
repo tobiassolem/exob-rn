@@ -6,23 +6,23 @@
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* Commodore 64 Palette */
+            /* Authentic Pepto Commodore 64 Palette */
             --c64-black: #000000;
             --c64-white: #FFFFFF;
-            --c64-red: #880000;
-            --c64-cyan: #AAFFEE;
-            --c64-purple: #CC44CC;
-            --c64-green: #00CC55;
-            --c64-blue: #0000AA;
-            --c64-yellow: #EEEE77;
-            --c64-orange: #DD8855;
-            --c64-brown: #664400;
-            --c64-light-red: #FF7777;
-            --c64-dark-grey: #333333;
-            --c64-grey: #777777;
-            --c64-light-green: #AAFF66;
-            --c64-light-blue: #0088FF;
-            --c64-light-grey: #BBBBBB;
+            --c64-red: #883932;
+            --c64-cyan: #67B6BD;
+            --c64-purple: #8B3F96;
+            --c64-green: #55A049;
+            --c64-blue: #40318D;
+            --c64-yellow: #BFCE72;
+            --c64-orange: #8B5429;
+            --c64-brown: #574200;
+            --c64-light-red: #B86962;
+            --c64-dark-grey: #505050;
+            --c64-grey: #787878;
+            --c64-light-green: #94E089;
+            --c64-light-blue: #7869C4;
+            --c64-light-grey: #9F9F9F;
 
             /* Game semantic mapping */
             --retro-yellow: var(--c64-yellow);
@@ -48,7 +48,7 @@
         #monitor-frame {
             background: var(--c64-light-blue);
             padding: 40px;
-            border: 20px solid #a5a5a5; /* Monitor plastic */
+            border: 20px solid #a5a5a5;
             box-shadow: inset 0 0 50px rgba(0,0,0,0.5), 0 20px 50px rgba(0,0,0,0.8);
             position: relative;
         }
@@ -72,29 +72,23 @@
             image-rendering: pixelated; 
             width: 1000px;
             height: 500px;
+            cursor: none; /* Hardware cursor suppression */
         }
-        /* CRT/Pixel Grid Overlay Effects */
         .pixel-grid {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
             background: linear-gradient(rgba(0, 0, 0, 0.2) 1px, transparent 1px), 
                         linear-gradient(90deg, rgba(0, 0, 0, 0.2) 1px, transparent 1px);
             background-size: 3px 3px;
             pointer-events: none;
-            z-index: 10; /* Above canvas, below some UI if needed, but usually looks best on top */
+            z-index: 10;
             opacity: 0.6;
         }
         .crt::before {
             content: " ";
             display: block;
             position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
+            top: 0; left: 0; bottom: 0; right: 0;
             background: radial-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 100%), rgba(18, 16, 16, 0.1);
             z-index: 11;
             pointer-events: none;
@@ -110,8 +104,7 @@
         }
         #initials-overlay, #shop-overlay { 
             position: absolute; 
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             background: var(--c64-blue); 
             border: 8px solid var(--c64-light-blue); 
@@ -131,8 +124,7 @@
         @keyframes blink { 50% { opacity: 0; } }
         #msg { 
             position: absolute; 
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             color: var(--c64-white); 
             background: var(--c64-blue); 
@@ -194,6 +186,40 @@
     <script type="module">
         import { SidPlayer } from './sidplayer.js';
 
+        // --- C64 COLORS (PEPTO PALETTE) ---
+        const C64 = {
+            BLACK: "#000000", WHITE: "#FFFFFF", RED: "#883932", CYAN: "#67B6BD",
+            PURPLE: "#8B3F96", GREEN: "#55A049", BLUE: "#40318D", YELLOW: "#BFCE72",
+            ORANGE: "#8B5429", BROWN: "#574200", LIGHT_RED: "#B86962", DARK_GREY: "#505050",
+            GREY: "#787878", LIGHT_GREEN: "#94E089", LIGHT_BLUE: "#7869C4", LIGHT_GREY: "#9F9F9F"
+        };
+
+        // --- BIOME CONFIG ---
+        const BIOMES = [
+            { id: 0, name: "EXOBÖRN", scrollX: true, scrollY: false, bg: C64.BLUE, platform: C64.BROWN },
+            { id: 1, name: "ÅGNESVILL", scrollX: false, scrollY: true, scrollDir: -1, bg: C64.BLACK, platform: C64.GREEN },
+            { id: 2, name: "SINKHÅL", scrollX: false, scrollY: true, scrollDir: 1, bg: C64.DARK_GREY, platform: C64.PURPLE }
+        ];
+
+        // --- ENTITY STATE ---
+        const player = {
+            x: 150, y: 250, w: 32, h: 48,
+            vx: 0, vy: 0,
+            isGrounded: false,
+            isDucking: false,
+            frame: 0,
+            hook: { active: false, x: 0, y: 0, length: 0, anchorPlatform: null }
+        };
+
+        const mouse = { x: 0, y: 0, isHovering: false, activeTarget: null };
+
+        // --- BACKGROUND ---
+        let bgLayers = [
+            { speed: 0.05, elements: [], color: C64.DARK_GREY },
+            { speed: 0.15, elements: [], color: C64.GREY },
+            { speed: 0.4, elements: [], color: C64.LIGHT_BLUE }
+        ];
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const bankEl = document.getElementById('bank');
@@ -229,16 +255,14 @@
                 signalValEl.style.color = "#ff5500";
                 isOnline = false;
             }
-            setTimeout(monitorUplink, 10000); // Heartbeat every 10s
+            setTimeout(monitorUplink, 10000);
         }
         monitorUplink();
 
         // --- PERSISTENCE ---
         let bank = parseInt(localStorage.getItem('exoborn_archive')) || 0;
         let augments = JSON.parse(localStorage.getItem('exoborn_augments')) || {
-            tether: 0, // max 5
-            kinetic: 0, // max 5
-            uplink: 0  // max 5
+            tether: 0, kinetic: 0, uplink: 0
         };
         let isBankrupt = false;
 
@@ -266,7 +290,7 @@
 
         function renderShop() {
             shopItemsEl.innerHTML = '';
-            const deploymentFee = Math.floor(500 + (bank * 0.1));
+            const deploymentFee = Math.floor(500 + ((bank + wallet) * 0.1));
             const deploymentInfo = document.getElementById('deployment-info');
             deploymentInfo.innerText = `NEXT DEPLOYMENT OVERHEAD: $${formatScore(deploymentFee)}`;
             
@@ -299,7 +323,6 @@
                             renderShop();
                             sfx.win();
                         } else {
-                            // play fail sfx
                             sidPoke(0x0E, 0x00); sidPoke(0x0F, 0x08);
                             sidPoke(0x12, 0x21); 
                             setTimeout(() => sidPoke(0x12, 0x20), 100);
@@ -312,7 +335,7 @@
             document.getElementById('retire-btn').onclick = () => {
                 if (confirm("SUBMIT ARCHIVE TO GLOBAL RECORD? UNIT WILL BE DISMANTLED.")) {
                     shopOverlay.style.display = "none";
-                    checkHighScore(bank, true); // Force score entry with Archive total
+                    checkHighScore(bank, true); 
                 }
             };
         }
@@ -321,7 +344,7 @@
         let audioCtx = null;
         let mainGain = null;
         let sid = new SidPlayer();
-        let sfxSid = new SidPlayer(); // Dedicated Virtual SID for SFX
+        let sfxSid = new SidPlayer(); 
         let isMusicPlaying = false;
         let sidList = [];
 
@@ -329,13 +352,12 @@
             if (audioCtx) return;
             await sid.initialise();
             audioCtx = sid.audioCtx;
-            await sfxSid.initialise(audioCtx); // Share the context
+            await sfxSid.initialise(audioCtx); 
 
             mainGain = audioCtx.createGain();
             mainGain.connect(audioCtx.destination);
             mainGain.gain.value = 0.3;
 
-            // Initialize Virtual SID Master Volume (0xD418) to max
             sidPoke(0x18, 0x0F);
 
             try {
@@ -348,7 +370,6 @@
             startMusic();
         }
 
-        // Direct SID register manipulation for authentic 8-bit SFX
         function sidPoke(addr, val) { if (sfxSid.isReady) sfxSid.poke(0xD400 + addr, val); }
 
         function startMusic() {
@@ -358,12 +379,10 @@
             const trackName = randomSid.replace('.sid', '').replace(/_/g, ' ').toUpperCase();
             if (nowPlayingEl) nowPlayingEl.innerText = `NOW PLAYING: ${trackName}`;
             sid.play(`sid/${randomSid}`);
-            sid.setVolume(0.32); // Lowered music volume
+            sid.setVolume(0.32);
         }
 
-        // --- SFX SYSTEM (VIRTUAL SID MULTI-CHANNEL) ---
         let sfxQueue = [];
-
         function tickSfx() {
             for (let i = sfxQueue.length - 1; i >= 0; i--) {
                 const effect = sfxQueue[i];
@@ -374,138 +393,94 @@
 
         const sfx = {
             jump: () => {
-                // TRIANGLE ASCENDING SWEEP (Voice 3)
-                let frame = 0;
-                let freq = 0x1800; 
-                sidPoke(0x12, 0x11); // Triangle + Gate
-                sidPoke(0x13, 0x00); sidPoke(0x14, 0x82); // ADSR: 0 Attack, Moderate Decay
+                let frame = 0; let freq = 0x1800; 
+                sidPoke(0x12, 0x11);
+                sidPoke(0x13, 0x00); sidPoke(0x14, 0x82); 
                 sfxQueue.push({
                     done: false,
                     tick: function() {
-                        frame++;
-                        freq = Math.floor(freq * 1.3); // Sharp ascent
+                        frame++; freq = Math.floor(freq * 1.3);
                         if (freq > 0xD000) freq = 0xD000;
-                        sidPoke(0x0E, freq & 0xFF);
-                        sidPoke(0x0F, (freq >> 8) & 0xFF);
-                        if (frame >= 12) {
-                            sidPoke(0x12, 0x10); // Gate OFF
-                            this.done = true;
-                        }
+                        sidPoke(0x0E, freq & 0xFF); sidPoke(0x0F, (freq >> 8) & 0xFF);
+                        if (frame >= 12) { sidPoke(0x12, 0x10); this.done = true; }
                     }
                 });
             },
             hook: () => {
-                // TWO-PART WINCH (Voice 3)
                 let frame = 0;
-                sidPoke(0x12, 0x81); // Part 1: Noise burst
+                sidPoke(0x12, 0x81);
                 sidPoke(0x13, 0x00); sidPoke(0x14, 0x22); 
                 sfxQueue.push({
                     done: false,
                     tick: function() {
                         frame++;
-                        if (frame === 3) {
-                            sidPoke(0x12, 0x41); // Part 2: Pulse
-                            sidPoke(0x13, 0x00); sidPoke(0x14, 0x44);
-                        }
+                        if (frame === 3) { sidPoke(0x12, 0x41); sidPoke(0x13, 0x00); sidPoke(0x14, 0x44); }
                         if (frame > 3) {
-                            // High-freq Vibrato + PWM Tension
                             const vib = Math.sin(frame * 1.2) * 600;
                             const modFreq = 0x3000 + vib;
                             sidPoke(0x0E, modFreq & 0xFF); sidPoke(0x0F, (modFreq >> 8) & 0xFF);
                             const pw = 0x0400 + (Math.sin(frame * 0.8) * 0x0200);
                             sidPoke(0x10, pw & 0xFF); sidPoke(0x11, (pw >> 8) & 0x0F);
                         }
-                        if (frame >= 25) {
-                            sidPoke(0x12, 0x40);
-                            this.done = true;
-                        }
+                        if (frame >= 25) { sidPoke(0x12, 0x40); this.done = true; }
                     }
                 });
             },
             loot1: () => {
-                // Basic blip (Voice 1)
-                sidPoke(0x00, 0x00); sidPoke(0x01, 0x35); // Mid-range static
-                sidPoke(0x04, 0x41); // Pulse
-                sidPoke(0x02, 0x00); sidPoke(0x03, 0x08); // Fixed 50% PW
-                sidPoke(0x05, 0x00); sidPoke(0x06, 0x20); // Fast decay
+                sidPoke(0x00, 0x00); sidPoke(0x01, 0x35); sidPoke(0x04, 0x41);
+                sidPoke(0x02, 0x00); sidPoke(0x03, 0x08); sidPoke(0x05, 0x00); sidPoke(0x06, 0x20);
                 setTimeout(() => sidPoke(0x04, 0x40), 50);
             },
             loot2: () => {
-                // Ascending perfect fifth (Voice 1)
                 const sequence = [0x35, 0x4F]; 
                 sequence.forEach((f, i) => {
                     setTimeout(() => {
-                        sidPoke(0x01, f);
-                        sidPoke(0x04, 0x41);
+                        sidPoke(0x01, f); sidPoke(0x04, 0x41);
                         sidPoke(0x05, 0x00); sidPoke(0x06, 0x40);
                         setTimeout(() => sidPoke(0x04, 0x40), 60);
                     }, i * 80);
                 });
             },
             loot3: () => {
-                // Major arpeggio + PWM (Voice 1)
-                let frame = 0;
-                const arpeggio = [0x35, 0x42, 0x4F]; 
-                sidPoke(0x04, 0x41);
-                sidPoke(0x05, 0x00); sidPoke(0x06, 0xA0); // Longer sustain
+                let frame = 0; const arpeggio = [0x35, 0x42, 0x4F]; 
+                sidPoke(0x04, 0x41); sidPoke(0x05, 0x00); sidPoke(0x06, 0xA0);
                 sfxQueue.push({
                     done: false,
                     tick: function() {
                         frame++;
                         const noteIdx = Math.min(2, Math.floor(frame / 5));
                         sidPoke(0x01, arpeggio[noteIdx]);
-                        // PWM Shimmer
                         const pw = 0x0600 + (Math.sin(frame * 0.4) * 0x0300);
                         sidPoke(0x02, pw & 0xFF); sidPoke(0x03, (pw >> 8) & 0x0F);
-                        if (frame >= 30) {
-                            sidPoke(0x04, 0x40);
-                            this.done = true;
-                        }
+                        if (frame >= 30) { sidPoke(0x04, 0x40); this.done = true; }
                     }
                 });
             },
             death: () => {
-                // Exponential Dive (Voice 1 Sawtooth + Voice 2 Noise)
-                let frame = 0;
-                let freq = 0x4000;
-                sidPoke(0x04, 0x21); // Saw (V1)
-                sidPoke(0x0B, 0x81); // Noise (V2)
-                sidPoke(0x05, 0x00); sidPoke(0x06, 0xCF); // Slow decay
+                let frame = 0; let freq = 0x4000;
+                sidPoke(0x04, 0x21); sidPoke(0x0B, 0x81); sidPoke(0x05, 0x00); sidPoke(0x06, 0xCF);
                 sfxQueue.push({
                     done: false,
                     tick: function() {
-                        frame++;
-                        freq = Math.floor(freq * 0.92); // Dive
-                        sidPoke(0x00, freq & 0xFF);
-                        sidPoke(0x01, (freq >> 8) & 0xFF);
+                        frame++; freq = Math.floor(freq * 0.92);
+                        sidPoke(0x00, freq & 0xFF); sidPoke(0x01, (freq >> 8) & 0xFF);
                         sidPoke(0x07, freq & 0xFF); sidPoke(0x08, (freq >> 8) & 0xFF);
-                        if (frame >= 45) {
-                            sidPoke(0x04, 0x20); sidPoke(0x0B, 0x80);
-                            this.done = true;
-                        }
+                        if (frame >= 45) { sidPoke(0x04, 0x20); sidPoke(0x0B, 0x80); this.done = true; }
                     }
                 });
             },
             win: () => {
-                // Triumphant Resolution (V1 Bass Triangle, V2 Pulse Melody)
                 let frame = 0;
-                const bass = [0x15, 0x1A, 0x20, 0x25];
-                const melody = [0x25, 0x30, 0x38, 0x45];
-                sidPoke(0x05, 0x00); sidPoke(0x06, 0xF0); // Solid envelopes
-                sidPoke(0x0C, 0x00); sidPoke(0x0D, 0xF0);
+                const bass = [0x15, 0x1A, 0x20, 0x25]; const melody = [0x25, 0x30, 0x38, 0x45];
+                sidPoke(0x05, 0x00); sidPoke(0x06, 0xF0); sidPoke(0x0C, 0x00); sidPoke(0x0D, 0xF0);
                 sfxQueue.push({
                     done: false,
                     tick: function() {
                         frame++;
                         const step = Math.min(3, Math.floor(frame / 10));
-                        sidPoke(0x01, bass[step]);
-                        sidPoke(0x04, 0x11); // Triangle
-                        sidPoke(0x08, melody[step]);
-                        sidPoke(0x0B, 0x41); // Pulse
-                        if (frame >= 60) {
-                            sidPoke(0x04, 0x10); sidPoke(0x0B, 0x40);
-                            this.done = true;
-                        }
+                        sidPoke(0x01, bass[step]); sidPoke(0x04, 0x11);
+                        sidPoke(0x08, melody[step]); sidPoke(0x0B, 0x41);
+                        if (frame >= 60) { sidPoke(0x04, 0x10); sidPoke(0x0B, 0x40); this.done = true; }
                     }
                 });
             },
@@ -527,7 +502,7 @@
         const GRAVITY = 0.52;
         let JUMP_POWER = -12.5;
         const AIR_FRICTION = 0.992;
-        const GROUND_FRICTION = 0.92; // Relaxed from 0.84 for smoother landings
+        const GROUND_FRICTION = 0.92; 
         const SWING_BOOST = 0.55;
         let HOOK_MAX_LENGTH = 300;
         const HOOK_REEL_SPEED = 1.5;
@@ -546,7 +521,6 @@
         let scrollSpeed = baseSpeed;
         let frameCount = 0;
         let keys = {};
-        let lastPlatformEndX = 1200;
 
         let highScores = [];
         let leaderboardStatus = "LOADING"; 
@@ -600,9 +574,17 @@
             JUMP_POWER = -12.5 - (augments.kinetic * 0.4);
         }
 
+        let currentLevel = BIOMES[0];
+        let traceTimer = 0; 
+        const TRACE_LIMIT = 5 * 60 * 1000; 
+
         function initLevel() {
-            const deploymentFee = Math.floor(500 + (bank * 0.1));
-            // Grace: Allow spawn if bank is 0 and no augments exist
+            const totalWealth = bank + wallet;
+            if (totalWealth >= 100000) currentLevel = BIOMES[2];
+            else if (totalWealth >= 50000) currentLevel = BIOMES[1];
+            else currentLevel = BIOMES[0];
+
+            const deploymentFee = Math.floor(500 + (totalWealth * 0.1));
             const isFreshStart = bank === 0 && augments.tether === 0 && augments.kinetic === 0 && augments.uplink === 0;
 
             if (bank < deploymentFee && !isFreshStart) {
@@ -613,21 +595,31 @@
                 return;
             }
             
-            if (!isFreshStart) {
-                bank -= deploymentFee;
-            }
+            if (!isFreshStart) bank -= deploymentFee;
             saveGame();
 
             initAudio();
             applyAugments();
-            platforms = [{ x: 0, y: 450, w: 1200, h: 50 }];
-            lastPlatformEndX = 1200; lastPlatformY = 450;
-            items = []; obstacles = [];
-            player.x = 150; player.y = 250; player.vx = 0; player.vy = 0;
+            
+            platforms = []; items = []; obstacles = [];
+            player.vx = 0; player.vy = 0;
             player.hook.active = false; player.hook.anchorPlatform = null;
             player.isDucking = false; wallet = 0;
             nearMissTimer = 0; difficultyWave = 0; safeZoneCounter = 0; frameCount = 0;
             keys = {};
+
+            if (currentLevel.id === 0) {
+                platforms = [{ x: 0, y: 450, w: 1200, h: 100 }];
+                player.x = 150; player.y = 250;
+            } else if (currentLevel.id === 1) { 
+                platforms = [{ x: 200, y: 450, w: 600, h: 40 }];
+                player.x = 450; player.y = 350;
+            } else if (currentLevel.id === 2) { 
+                platforms = [{ x: 200, y: 50, w: 600, h: 40 }];
+                player.x = 450; player.y = 100;
+                traceTimer = TRACE_LIMIT;
+            }
+
             scrollSpeed = baseSpeed; updateUI();
             gameActive = true; enteringScore = false; showLeaderboard = false;
             msgEl.style.display = "none"; initialsOverlay.style.display = "none";
@@ -637,7 +629,7 @@
 
         function formatScore(n) {
             if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-            if (n >= 100000) return (n / 1000).toFixed(0) + 'K';
+            if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
             return n.toLocaleString();
         }
 
@@ -646,385 +638,397 @@
         function updateUI() {
             currentEl.innerText = formatScore(wallet);
             bankEl.innerText = formatScore(bank);
-            
-            // Visual feedback for extraction availability
-            if (wallet >= EXTRACT_THRESHOLD) {
-                currentEl.classList.add('extract-glow');
-            } else {
-                currentEl.classList.remove('extract-glow');
-            }
-
+            if (wallet >= EXTRACT_THRESHOLD) currentEl.classList.add('extract-glow');
+            else currentEl.classList.remove('extract-glow');
             const rawBoost = Math.log2(1 + wallet / 3000) * 1.8;
             const maxBoost = 4.5;
             scrollSpeed = gameActive ? baseSpeed + Math.min(rawBoost, maxBoost) : baseSpeed;
         }
 
-        let lastPlatformY = 450;
+function spawnEntities() {
+    frameCount++;
+    difficultyWave = 0.5 + 0.5 * Math.sin(frameCount * 0.003); 
+    const diff = Math.min(1.2, (scrollSpeed - baseSpeed) / 6);
+    const waveDiff = diff * (0.4 + 0.6 * difficultyWave);
 
-        function spawnEntities() {
-            frameCount++;
-            difficultyWave = 0.5 + 0.5 * Math.sin(frameCount * 0.003); // oscillates 0..1
-            const diff = Math.min(1.2, (scrollSpeed - baseSpeed) / 6);
-            const waveDiff = diff * (0.4 + 0.6 * difficultyWave); // difficulty breathes
-
-            if (lastPlatformEndX < canvas.width + 500) {
-                safeZoneCounter++;
-                // Cap gap to what's physically jumpable (jump covers ~200px horizontal at max speed)
-                const maxGap = 160 + 60 * waveDiff;
-                const minGap = 60;
-                const gap = minGap + Math.random() * (maxGap - minGap);
-                // Constrain height relative to previous platform (max 60px change, reachable by jump)
-                const heightDelta = (Math.random() - 0.45) * 60;
-                const newY = Math.max(340, Math.min(470, lastPlatformY + heightDelta));
-                // Minimum width scales down gently with difficulty, but stays usable
-                const minW = Math.max(150, 250 - waveDiff * 80);
-                const w = minW + Math.random() * 400;
-                // Every 5th platform is a safe zone (wide, stable)
-                const isSafe = safeZoneCounter % 5 === 0;
-                const finalW = isSafe ? Math.max(w, 400) : w;
-
-                platforms.push({ x: lastPlatformEndX + gap, y: newY, w: finalW, h: 100 });
-                lastPlatformEndX = lastPlatformEndX + gap + finalW;
-                lastPlatformY = newY;
-            }
-            // Floating platforms — spawn relative to nearby ground level, always reachable
-            if (frameCount % 100 === 0) {
-                const floatY = Math.max(80, lastPlatformY - 140 - Math.random() * 120);
-                platforms.push({ x: canvas.width, y: floatY, w: 100 + Math.random() * 60, h: 20 });
-            }
-            if (frameCount % 55 === 0) {
-                const luck = Math.random();
-                if (luck > 0.94) {
-                    const ty = 40 + Math.random() * 80;
-                    items.push({ x: canvas.width, y: ty, w: 22, h: 22, val: 7500, tier: 3 });
-                    obstacles.push({ x: canvas.width + 40, y: ty + (Math.random() - 0.5) * 30, w: 35, h: 35 });
-                } else if (luck > 0.72) {
-                    items.push({ x: canvas.width, y: 140 + Math.random() * 120, w: 18, h: 18, val: 2500, tier: 2 });
-                } else if (luck > 0.35) {
-                    items.push({ x: canvas.width, y: 280 + Math.random() * 100, w: 15, h: 15, val: 500, tier: 1 });
-                }
-                // Obstacles scale with difficulty wave — breather moments have fewer obstacles
-                if (Math.random() < 0.2 + waveDiff * 0.4) {
-                    const oy = 100 + Math.random() * 280;
-                    obstacles.push({ x: canvas.width, y: oy, w: 30 + waveDiff * 15, h: 30 + waveDiff * 15 });
-                }
-            }
+    if (currentLevel.id === 0) { 
+        // 1. Separate ground and aerial tracking to prevent structural pollution
+        const groundPlats = platforms.filter(p => p.h >= 50);
+        const aerialPlats = platforms.filter(p => p.h < 50);
+        
+        let rightmostGroundX = 0;
+        let currentGroundY = 450;
+        
+        if (groundPlats.length > 0) {
+            const lastG = groundPlats[groundPlats.length - 1];
+            rightmostGroundX = lastG.x + lastG.w;
+            currentGroundY = lastG.y;
         }
+
+        // 2. Generate Tactical Ground Floor
+        if (groundPlats.length < 3 || rightmostGroundX < canvas.width + 500) {
+            safeZoneCounter++;
+            const maxGap = 180 + 100 * waveDiff;
+            const gap = 80 + Math.random() * (maxGap - 80); // Increased minimum gaps
+            const heightDelta = (Math.random() - 0.5) * 80;
+            
+            // Push the floor further down relative to the 500px canvas height
+            const newY = Math.max(400, Math.min(480, currentGroundY + heightDelta)); 
+            const w = Math.max(100, 200 - waveDiff * 80) + Math.random() * 250; 
+            const spawnX = Math.max(canvas.width + 50, rightmostGroundX + gap);
+            platforms.push({ x: spawnX, y: newY, w: w, h: 100 });
+        }
+
+        // 3. Generate Upper Aerial Canopy
+        let rightmostAerialX = canvas.width;
+        if (aerialPlats.length > 0) {
+            const lastA = aerialPlats[aerialPlats.length - 1];
+            rightmostAerialX = lastA.x + lastA.w;
+        }
+
+        if (aerialPlats.length < 4 || rightmostAerialX < canvas.width + 400) {
+            const gap = 150 + Math.random() * 250; // Enforce strict horizontal spacing
+            const aerialY = 80 + Math.random() * 160;
+            const aerialW = 60 + Math.random() * 100;
+            const spawnX = Math.max(canvas.width + 100, rightmostAerialX + gap);
+            platforms.push({ x: spawnX, y: aerialY, w: aerialW, h: 20 });
+        }
+
+    } else { 
+        const isClimb = currentLevel.id === 1;
+        const lastP = platforms[platforms.length - 1];
+        const condition = !lastP || (isClimb ? lastP.y > -100 : lastP.y < canvas.height + 100);
+        
+        if (condition) {
+            const gap = 120 + 80 * waveDiff;
+            const startY = lastP ? lastP.y : (isClimb ? canvas.height : 0);
+            const nextY = isClimb ? startY - gap : startY + gap;
+            const nextX = 50 + Math.random() * (canvas.width - 250);
+            platforms.push({ x: nextX, y: nextY, w: 150 + Math.random() * 200, h: 30 });
+        }
+    }
+
+    // Item & Obstacle Generation (Unchanged)
+    if (frameCount % 55 === 0) {
+        const luck = Math.random();
+        let sx = canvas.width, sy = 100 + Math.random() * 300;
+        if (currentLevel.id !== 0) {
+            sx = 100 + Math.random() * (canvas.width - 200);
+            sy = currentLevel.id === 1 ? -50 : canvas.height + 50;
+        }
+        if (luck > 0.94) items.push({ x: sx, y: sy, w: 22, h: 22, val: 7500, tier: 3 });
+        else if (luck > 0.72) items.push({ x: sx, y: sy, w: 18, h: 18, val: 2500, tier: 2 });
+        else if (luck > 0.35) items.push({ x: sx, y: sy, w: 15, h: 15, val: 500, tier: 1 });
+        
+        if (Math.random() < 0.2 + waveDiff * 0.4) {
+            const ox = currentLevel.id === 0 ? canvas.width : 50 + Math.random() * (canvas.width-100);
+            const oy = currentLevel.id === 0 ? 100 + Math.random() * 280 : (currentLevel.id === 1 ? -80 : canvas.height + 80);
+            obstacles.push({ x: ox, y: oy, w: 30 + waveDiff * 15, h: 30 + waveDiff * 15 });
+        }
+    }
+}
 
         function update(dt) {
             const scalar = dt / 16.66;
-            tickSfx(); // Handle SID sweeps
+            tickSfx(); 
+            if (gameActive && currentLevel.id === 2) {
+                traceTimer -= dt;
+                if (traceTimer <= 0) { traceTimer = 0; gameOver(); showMsg("<span style='color:" + C64.RED + ";'>*** RIBÖRF TRACE DETECTED ***</span><br><br>CORE OVERHEAT. SYSTEM PURGED.<br><br>READY.<br>█"); }
+            }
             bgLayers.forEach(l => l.elements.forEach(e => {
-                e.x -= scrollSpeed * l.speed * scalar;
-                if (e.x + e.w < 0) e.x = canvas.width + Math.random() * 100;
+                if (currentLevel.scrollX) {
+                    e.x -= scrollSpeed * l.speed * scalar;
+                    if (e.x + e.w < 0) e.x = canvas.width + Math.random() * 100;
+                } else { 
+                    e.y -= scrollSpeed * l.speed * scalar * currentLevel.scrollDir;
+                    if (currentLevel.scrollDir === -1 && e.y > canvas.height) e.y = -e.h;
+                    if (currentLevel.scrollDir === 1 && e.y + e.h < 0) e.y = canvas.height;
+                }
             }));
+            
             if (!gameActive || enteringScore) return;
+            
             spawnEntities();
+            
+            const wasGrounded = player.isGrounded;
             player.vy += GRAVITY * scalar;
             if (coyoteTime > 0) coyoteTime -= dt;
             if (jumpBuffer > 0) jumpBuffer -= dt;
-            lastPlatformEndX -= scrollSpeed * scalar;
-            platforms.forEach(p => p.x -= scrollSpeed * scalar);
-            items.forEach(i => i.x -= scrollSpeed * scalar);
-            obstacles.forEach(o => o.x -= scrollSpeed * scalar);
+            const sV = scrollSpeed * scalar;
+            let scrollVY = 0;
+            
+            if (currentLevel.scrollX) {
+                platforms.forEach(p => p.x -= sV);
+                items.forEach(i => i.x -= sV);
+                obstacles.forEach(o => o.x -= sV);
+            } else {
+                scrollVY = sV * currentLevel.scrollDir;
+                platforms.forEach(p => p.y -= scrollVY);
+                items.forEach(i => i.y -= scrollVY);
+                obstacles.forEach(o => o.y -= scrollVY);
+            }
+            
             if (player.hook.active) {
-                // Anchor moves with its platform (not raw scroll) for stability
                 const ap = player.hook.anchorPlatform;
-                if (ap) {
-                    player.hook.x = ap.x + player.hook.anchorOffsetX;
-                    player.hook.y = ap.y;
-                }
-                // Reel in when holding up, reel out when holding down
-                if (keys['ArrowUp'] || keys['KeyW']) player.hook.length = Math.max(60, player.hook.length - HOOK_REEL_SPEED * scalar);
+                if (ap) { player.hook.x = ap.x + player.hook.anchorOffsetX; player.hook.y = ap.y + (player.hook.anchorOffsetY || 0); }
+                if (keys['ArrowUp'] || keys['KeyW']) player.hook.length = Math.max(40, player.hook.length - (HOOK_REEL_SPEED + 1) * scalar);
                 if (keys['ArrowDown'] || keys['KeyS']) player.hook.length = Math.min(HOOK_MAX_LENGTH, player.hook.length + HOOK_REEL_SPEED * scalar);
-
                 const cx = player.x + player.w / 2, cy = player.y + player.h / 2;
                 const dx = cx - player.hook.x, dy = cy - player.hook.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-
                 if (dist > player.hook.length) {
-                    // Rope is taut — apply pendulum constraint
                     const nx = dx / dist, ny = dy / dist;
-                    // Project position back onto rope circle
                     player.x = player.hook.x + nx * player.hook.length - player.w / 2;
                     player.y = player.hook.y + ny * player.hook.length - player.h / 2;
-                    // Remove radial velocity component, preserve tangential (pendulum swing)
                     const radialV = player.vx * nx + player.vy * ny;
-                    if (radialV > 0) {
-                        player.vx -= radialV * nx;
-                        player.vy -= radialV * ny;
-                    }
-                    // Add tangential swing force from input
-                    const tx = -ny, ty = nx; // tangent vector (perpendicular to rope)
-                    if (keys['ArrowRight'] || keys['KeyD']) { player.vx += tx * SWING_BOOST * scalar; player.vy += ty * SWING_BOOST * scalar; }
-                    if (keys['ArrowLeft'] || keys['KeyA']) { player.vx -= tx * SWING_BOOST * scalar; player.vy -= ty * SWING_BOOST * scalar; }
+                    if (radialV > 0) { player.vx -= radialV * nx * 0.8; player.vy -= radialV * ny * 0.8; }
+                    const tx = -ny, ty = nx; 
+                    const swingDir = (keys['ArrowRight'] || keys['KeyD']) ? 1 : ((keys['ArrowLeft'] || keys['KeyA']) ? -1 : 0);
+                    if (swingDir !== 0) { player.vx += tx * swingDir * SWING_BOOST * scalar; player.vy += ty * swingDir * SWING_BOOST * scalar; }
                 }
-                // Gentle damping to prevent wild oscillations
-                player.vx *= Math.pow(HOOK_DAMPING, scalar);
-                player.vy *= Math.pow(HOOK_DAMPING, scalar);
-
-                // Detach if anchor platform scrolled off screen
-                if (ap && ap.x + ap.w < -50) player.hook.active = false;
+                player.vx *= Math.pow(HOOK_DAMPING, scalar); player.vy *= Math.pow(HOOK_DAMPING, scalar);
+                if (currentLevel.scrollX && ap && ap.x + ap.w < -50) player.hook.active = false;
+                if (!currentLevel.scrollX && ap && (ap.y > canvas.height + 100 || ap.y < -100)) player.hook.active = false;
             }
-            // Player horizontal movement — ground has full authority, air has reduced control
+            
             if (!player.hook.active) {
-                const moveForce = (player.isGrounded || coyoteTime > 0) ? 0.6 : 0.3;
+                const isVertical = !currentLevel.scrollX;
+                const moveForce = player.isGrounded ? 0.6 : (isVertical ? 0.45 : 0.25);
                 if (keys['ArrowRight'] || keys['KeyD']) player.vx += moveForce * scalar;
                 if (keys['ArrowLeft'] || keys['KeyA']) player.vx -= moveForce * scalar;
-                // Duck-slide: ducking on ground gives a speed burst
                 if (player.isDucking && player.isGrounded && Math.abs(player.vx) > 0.5) player.vx *= 1.01;
             }
-            // Friction: hook has its own damping, don't double-apply
-            if (!player.hook.active) {
-                player.vx *= Math.pow(player.isGrounded ? GROUND_FRICTION : AIR_FRICTION, scalar);
+            
+            player.vx *= Math.pow(player.isGrounded ? GROUND_FRICTION : AIR_FRICTION, scalar);
+            
+            if (currentLevel.id === 0) {
+                const driftFromCenter = 150 - player.x;
+                if (!player.hook.active && player.isGrounded && !keys['ArrowRight'] && !keys['KeyD'] && !keys['ArrowLeft'] && !keys['KeyA'] && Math.abs(driftFromCenter) > 40) {
+                    const springForce = driftFromCenter * 0.0008;
+                    const dampingForce = player.vx * 0.06;
+                    player.vx += (springForce - dampingForce) * scalar;
+                }
             }
-            // Soft auto-centering — gentler spring with damping to prevent backward sliding
-            const driftFromCenter = 150 - player.x;
-            if (!player.hook.active && player.isGrounded && !keys['ArrowRight'] && !keys['KeyD'] && !keys['ArrowLeft'] && !keys['KeyA'] && Math.abs(driftFromCenter) > 40) {
-                const springForce = driftFromCenter * 0.0008; // Reduced from 0.003
-                const dampingForce = player.vx * 0.06;
-                player.vx += (springForce - dampingForce) * scalar;
-            }
+            
             player.x += player.vx * scalar; player.y += player.vy * scalar;
             if (nearMissTimer > 0) nearMissTimer -= dt;
             player.isGrounded = false;
+            
             let pH = player.isDucking ? player.h / 2 : player.h;
             let pT = player.isDucking ? player.y + player.h / 2 : player.y;
+            
             for (let p of platforms) {
                 if (player.x + player.w > p.x && player.x < p.x + p.w) {
-                    if (player.vy >= 0 && pT + pH >= p.y && pT + pH <= p.y + 30) {
-                        player.y = p.y - player.h; player.vy = 0; player.isGrounded = true; coyoteTime = 120;
+                    const checkBottom = pT + pH;
+                    if (player.vy >= 0 && checkBottom >= p.y && checkBottom <= p.y + 35) {
+                        player.y = p.y - player.h; player.vy = 0; player.isGrounded = true; coyoteTime = 150;
+                        break;
                     }
                 }
             }
+            
+            if (!player.isGrounded && wasGrounded && currentLevel.id === 1 && !keys['Space'] && !keys['KeyW'] && !keys['ArrowUp']) {
+                for (let p of platforms) {
+                    if (player.x + player.w > p.x && player.x < p.x + p.w) {
+                        const distToTop = Math.abs(pT + pH - p.y);
+                        if (distToTop < 15) { player.y = p.y - player.h; player.vy = 0; player.isGrounded = true; break; }
+                    }
+                }
+            }
+            
             if (jumpBuffer > 0 && (player.isGrounded || coyoteTime > 0)) {
                 sfx.jump();
-                player.vy = JUMP_POWER; player.isGrounded = false; coyoteTime = 0; jumpBuffer = 0;
-                player.hook.active = false;
+                player.vy = JUMP_POWER - (scrollVY < 0 ? scrollVY * 0.5 : 0); 
+                player.isGrounded = false; coyoteTime = 0; jumpBuffer = 0; player.hook.active = false;
             }
+            
             if (player.x < 0) { player.x = 0; player.vx = 0; }
             if (player.x + player.w > canvas.width) { player.x = canvas.width - player.w; player.vx = 0; }
-            if (player.y > canvas.height) gameOver();
+            if (currentLevel.id === 1 && player.y > canvas.height + 20) gameOver(); 
+            if (currentLevel.id === 2 && player.y < -40) gameOver();
+            if (player.y > canvas.height + 200 || player.y < -200) gameOver();
+            
             for (let o of obstacles) {
                 if (player.x < o.x + o.w && player.x + player.w > o.x && pT < o.y + o.h && pT + pH > o.y) { gameOver(); break; }
-                // Near-miss detection — reward close calls with brief visual juice
-                const nearPad = 12;
+                const nearPad = 15;
                 if (nearMissTimer <= 0 && player.x < o.x + o.w + nearPad && player.x + player.w + nearPad > o.x && pT < o.y + o.h + nearPad && pT + pH + nearPad > o.y) {
-                    if (!(player.x < o.x + o.w && player.x + player.w > o.x && pT < o.y + o.h && pT + pH > o.y)) {
-                        nearMissTimer = 400; // 400ms of "close call" visual feedback
-                        wallet += 100; // small reward for skillful play
-                        updateUI();
-                    }
+                    nearMissTimer = 400; wallet += 100; updateUI();
                 }
             }
+            
             for (let i of items) if (!i.collected && player.x < i.x + i.w && player.x + player.w > i.x && pT < i.y + i.h && pT + pH > i.y) {
                 i.collected = true; wallet += i.val; updateUI();
                 if (i.tier === 1) sfx.loot1(); else if (i.tier === 2) sfx.loot2(); else sfx.loot3();
             }
-            platforms = platforms.filter(p => p.x + p.w > -100);
-            items = items.filter(i => i.x + i.w > -100 && !i.collected);
-            obstacles = obstacles.filter(o => o.x + o.w > -100);
+            
+            const buffer = 400; 
+            platforms = platforms.filter(p => {
+                if (currentLevel.scrollX) return p.x + p.w > -buffer;
+                if (currentLevel.id === 1) return p.y < canvas.height + buffer;
+                if (currentLevel.id === 2) return p.y + p.h > -buffer;
+                return true;
+            });
+            items = items.filter(i => {
+                if (i.collected) return false;
+                if (currentLevel.scrollX) return i.x + i.w > -buffer;
+                if (currentLevel.id === 1) return i.y < canvas.height + buffer;
+                if (currentLevel.id === 2) return i.y + i.h > -buffer;
+                return true;
+            });
+            obstacles = obstacles.filter(o => {
+                if (currentLevel.scrollX) return o.x + o.w > -buffer;
+                if (currentLevel.id === 1) return o.y < canvas.height + buffer;
+                if (currentLevel.id === 2) return o.y + o.h > -buffer;
+                return true;
+            });
         }
-
-        // --- C64 COLORS ---
-        const C64 = {
-            BLACK: "#000000", WHITE: "#FFFFFF", RED: "#880000", CYAN: "#AAFFEE",
-            PURPLE: "#CC44CC", GREEN: "#00CC55", BLUE: "#0000AA", YELLOW: "#EEEE77",
-            ORANGE: "#DD8855", BROWN: "#664400", LIGHT_RED: "#FF7777", DARK_GREY: "#333333",
-            GREY: "#777777", LIGHT_GREEN: "#AAFF66", LIGHT_BLUE: "#0088FF", LIGHT_GREY: "#BBBBBB"
-        };
-
-        const player = {
-            x: 150, y: 250, w: 32, h: 48, // Slightly wider for blocky feel
-            vx: 0, vy: 0,
-            isGrounded: false,
-            isDucking: false,
-            frame: 0,
-            hook: { active: false, x: 0, y: 0, length: 0, anchorPlatform: null }
-        };
-
-        let bgLayers = [
-            { speed: 0.05, elements: [], color: C64.DARK_GREY },
-            { speed: 0.15, elements: [], color: C64.GREY },
-            { speed: 0.4, elements: [], color: C64.LIGHT_BLUE }
-        ];
 
         function drawPlayer(x, y, w, h, ducking, grounded) {
             const bodyColor = nearMissTimer > 0 ? C64.WHITE : C64.YELLOW;
             const accentColor = C64.ORANGE;
-            
-            ctx.fillStyle = C64.BLACK; // Shadow
-            ctx.fillRect(x + 4, y + 4, w, h);
-
-            ctx.fillStyle = bodyColor;
-            ctx.fillRect(x, y, w, h);
-
-            // "Visor" or eyes
+            ctx.fillStyle = C64.BLACK; ctx.fillRect(x + 4, y + 4, w, h);
+            ctx.fillStyle = bodyColor; ctx.fillRect(x, y, w, h);
             ctx.fillStyle = C64.BLACK;
             const eyeX = player.vx >= 0 ? x + 20 : x + 4;
             ctx.fillRect(eyeX, y + 8, 8, 8);
-            ctx.fillStyle = C64.CYAN;
-            ctx.fillRect(eyeX + 2, y + 10, 4, 4);
-
-            // Detailing
-            ctx.fillStyle = accentColor;
-            ctx.fillRect(x, y + h - 8, w, 8); // Boots
-            
-            if (!grounded) {
-                // "Thruster" or jump visual
-                ctx.fillStyle = C64.WHITE;
-                ctx.fillRect(x + w/4, y + h, w/2, 4);
-            }
+            ctx.fillStyle = C64.CYAN; ctx.fillRect(eyeX + 2, y + 10, 4, 4);
+            ctx.fillStyle = accentColor; ctx.fillRect(x, y + h - 8, w, 8); 
+            if (!grounded) { ctx.fillStyle = C64.WHITE; ctx.fillRect(x + w/4, y + h, w/2, 4); }
         }
 
         function draw() {
-            // Background - Classic C64 screen color
-            ctx.fillStyle = C64.BLUE;
+            ctx.fillStyle = currentLevel.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Parallax Background
             bgLayers.forEach((l, i) => {
                 ctx.fillStyle = l.color;
                 l.elements.forEach(e => {
-                    if (i === 0) {
-                        // Distant "stars" or data bits
-                        ctx.fillRect(e.x, e.y, 4, 4);
-                    } else {
-                        // Blocky "buildings" or circuit blocks
+                    if (i === 0) ctx.fillRect(e.x, e.y, 4, 4);
+                    else {
                         ctx.fillRect(e.x, e.y, e.w, e.h);
-                        ctx.fillStyle = C64.BLACK;
-                        ctx.fillRect(e.x + 4, e.y + 4, e.w - 8, 4); // "Windows" or traces
+                        ctx.fillStyle = C64.BLACK; ctx.fillRect(e.x + 4, e.y + 4, e.w - 8, 4); 
                         ctx.fillStyle = l.color;
                     }
                 });
             });
-
             if (gameActive) {
-                // Platforms
                 platforms.forEach(p => {
-                    ctx.fillStyle = C64.BROWN;
-                    ctx.fillRect(p.x, p.y, p.w, p.h);
-                    ctx.fillStyle = C64.BLACK;
-                    ctx.fillRect(p.x, p.y, p.w, 4); // Top edge line
-                    // Side shading
-                    ctx.fillStyle = "rgba(0,0,0,0.3)";
-                    ctx.fillRect(p.x, p.y + 4, 8, p.h);
+                    ctx.fillStyle = currentLevel.platform; ctx.fillRect(p.x, p.y, p.w, p.h);
+                    ctx.fillStyle = C64.BLACK; ctx.fillRect(p.x, p.y, p.w, 4);
+                    ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fillRect(p.x, p.y + 4, 8, p.h);
                 });
-
-                // Obstacles - Spiky or hazard blocks
-                obstacles.forEach(o => {
-                    ctx.fillStyle = C64.RED;
-                    ctx.fillRect(o.x, o.y, o.w, o.h);
-                    ctx.fillStyle = C64.LIGHT_RED;
-                    ctx.fillRect(o.x + 4, o.y + 4, o.w - 8, o.h - 8);
-                    
-                    // Animated hazard cross
-                    if (frameCount % 30 < 15) {
-                        ctx.fillStyle = C64.WHITE;
-                        ctx.fillRect(o.x + o.w/2 - 2, o.y + 2, 4, o.h - 4);
-                        ctx.fillRect(o.x + 2, o.y + o.h/2 - 2, o.w - 4, 4);
-                    }
-                });
-
-                // Items - Floating data pods
-                items.forEach(i => {
-                    const colors = [C64.WHITE, C64.CYAN, C64.PURPLE];
-                    const color = i.tier === 2 ? C64.CYAN : (i.tier === 3 ? C64.PURPLE : C64.YELLOW);
-                    
-                    ctx.fillStyle = C64.BLACK;
-                    ctx.fillRect(i.x + 2, i.y + 2, i.w, i.h);
-                    
-                    ctx.fillStyle = color;
-                    ctx.fillRect(i.x, i.y, i.w, i.h);
-                    
-                    // Inner "glint"
-                    ctx.fillStyle = C64.WHITE;
-                    ctx.fillRect(i.x + 2, i.y + 2, 4, 4);
-                });
-
-                // Hook/Tether
-                if (player.hook.active) {
-                    ctx.strokeStyle = C64.WHITE;
-                    ctx.lineWidth = 4;
-                    ctx.beginPath();
-                    ctx.moveTo(player.x + player.w / 2, player.y + 16);
-                    ctx.lineTo(player.hook.x, player.hook.y);
-                    ctx.stroke();
-                    
-                    ctx.fillStyle = C64.LIGHT_BLUE;
-                    ctx.fillRect(player.hook.x - 8, player.hook.y - 4, 16, 8);
+                if (currentLevel.id === 2 && gameActive) {
+                    const secs = Math.ceil(traceTimer / 1000);
+                    const isCritical = secs < 60;
+                    ctx.fillStyle = (isCritical && frameCount % 20 < 10) ? C64.RED : C64.WHITE;
+                    ctx.font = "14px 'Press Start 2P'"; ctx.textAlign = "center";
+                    ctx.fillText(`RIBÖRF TRACE: ${Math.floor(secs/60)}:${(secs%60).toString().padStart(2, '0')}`, 500, 40);
+                    if (isCritical) { ctx.strokeStyle = C64.RED; ctx.lineWidth = 4; ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4); }
                 }
-
-                // Player
+                obstacles.forEach(o => {
+                    ctx.fillStyle = C64.RED; ctx.fillRect(o.x, o.y, o.w, o.h);
+                    ctx.fillStyle = C64.LIGHT_RED; ctx.fillRect(o.x + 4, o.y + 4, o.w - 8, o.h - 8);
+                    if (frameCount % 30 < 15) { ctx.fillStyle = C64.WHITE; ctx.fillRect(o.x + o.w/2 - 2, o.y + 2, 4, o.h - 4); ctx.fillRect(o.x + 2, o.y + o.h/2 - 2, o.w - 4, 4); }
+                });
+                items.forEach(i => {
+                    const color = i.tier === 2 ? C64.CYAN : (i.tier === 3 ? C64.PURPLE : C64.YELLOW);
+                    ctx.fillStyle = C64.BLACK; ctx.fillRect(i.x + 2, i.y + 2, i.w, i.h);
+                    ctx.fillStyle = color; ctx.fillRect(i.x, i.y, i.w, i.h);
+                    ctx.fillStyle = C64.WHITE; ctx.fillRect(i.x + 2, i.y + 2, 4, 4);
+                });
+                if (player.hook.active) {
+                    ctx.strokeStyle = C64.WHITE; ctx.lineWidth = 4; ctx.beginPath();
+                    ctx.moveTo(player.x + player.w / 2, player.y + 16); ctx.lineTo(player.hook.x, player.hook.y); ctx.stroke();
+                    ctx.fillStyle = C64.LIGHT_BLUE; ctx.fillRect(player.hook.x - 8, player.hook.y - 4, 16, 8);
+                }
                 let dH = player.isDucking ? player.h / 2 : player.h;
                 let dY = player.isDucking ? player.y + player.h / 2 : player.y;
                 drawPlayer(player.x, dY, player.w, dH, player.isDucking, player.isGrounded);
-
-                // Near-miss flash
                 if (nearMissTimer > 0) {
-                    ctx.fillStyle = "rgba(255,255,255,0.2)";
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.fillStyle = C64.WHITE;
-                    ctx.font = "12px 'Press Start 2P'";
-                    ctx.textAlign = "center";
+                    ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = C64.WHITE; ctx.font = "12px 'Press Start 2P'"; ctx.textAlign = "center";
                     ctx.fillText("CRITICAL DODGE!", player.x + player.w / 2, dY - 20);
                 }
             }
 
-            // Leaderboard & Overlays
+// Draw Tactical Crosshair
+if (gameActive && !enteringScore) {
+    // Determine stark, readable colour states
+    const crossColor = mouse.isHovering ? C64.YELLOW : C64.WHITE;
+    
+    // 1. Draw outer black shadow for absolute contrast
+    ctx.strokeStyle = C64.BLACK;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(mouse.x - 14, mouse.y); ctx.lineTo(mouse.x - 4, mouse.y);
+    ctx.moveTo(mouse.x + 14, mouse.y); ctx.lineTo(mouse.x + 4, mouse.y);
+    ctx.moveTo(mouse.x, mouse.y - 14); ctx.lineTo(mouse.x, mouse.y - 4);
+    ctx.moveTo(mouse.x, mouse.y + 14); ctx.lineTo(mouse.x, mouse.y + 4);
+    ctx.stroke();
+
+    // 2. Draw inner primary crosshair
+    ctx.strokeStyle = crossColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(mouse.x - 13, mouse.y); ctx.lineTo(mouse.x - 5, mouse.y);
+    ctx.moveTo(mouse.x + 13, mouse.y); ctx.lineTo(mouse.x + 5, mouse.y);
+    ctx.moveTo(mouse.x, mouse.y - 13); ctx.lineTo(mouse.x, mouse.y - 5);
+    ctx.moveTo(mouse.x, mouse.y + 13); ctx.lineTo(mouse.x, mouse.y + 5);
+    ctx.stroke();
+
+    // Render range telemetry
+    if (mouse.isHovering && mouse.activeTarget) {
+        const cx = player.x + player.w / 2;
+        const cy = player.y + player.h / 2;
+        const dist = Math.sqrt(Math.pow(cx - mouse.x, 2) + Math.pow(cy - mouse.y, 2));
+        
+        const txt = dist > HOOK_MAX_LENGTH ? "OUT OF RANGE" : "LOCK";
+        const txtColor = dist > HOOK_MAX_LENGTH ? C64.LIGHT_RED : C64.YELLOW;
+
+        ctx.font = "8px 'Press Start 2P'";
+        
+        // Text drop shadow
+        ctx.fillStyle = C64.BLACK;
+        ctx.fillText(txt, mouse.x + 16, mouse.y + 16);
+        
+        // Text primary colour
+        ctx.fillStyle = txtColor;
+        ctx.fillText(txt, mouse.x + 15, mouse.y + 15);
+    }
+}
+
             if (showLeaderboard && !enteringScore && shopOverlay.style.display !== "block") {
-                ctx.fillStyle = "rgba(0, 0, 170, 0.95)"; // C64 Blue
-                ctx.fillRect(200, 40, 600, 420);
-                ctx.strokeStyle = C64.LIGHT_BLUE;
-                ctx.lineWidth = 8;
-                ctx.strokeRect(200, 40, 600, 420);
-                
-                ctx.fillStyle = C64.WHITE;
-                ctx.font = "20px 'Press Start 2P'";
-                ctx.textAlign = "center";
+                ctx.fillStyle = "rgba(0, 0, 170, 0.95)"; ctx.fillRect(200, 40, 600, 420);
+                ctx.strokeStyle = C64.LIGHT_BLUE; ctx.lineWidth = 8; ctx.strokeRect(200, 40, 600, 420);
+                ctx.fillStyle = C64.WHITE; ctx.font = "20px 'Press Start 2P'"; ctx.textAlign = "center";
                 ctx.fillText("COMMODORE ELITE", 500, 100);
-                
                 ctx.font = "12px 'Press Start 2P'";
                 if (leaderboardStatus === "LOADING") ctx.fillText("CONNECTING...", 500, 240);
-                else if (leaderboardStatus === "ERROR") {
-                    ctx.fillStyle = C64.RED;
-                    ctx.fillText("IO ERROR", 500, 220);
-                } else if (leaderboardStatus === "EMPTY") ctx.fillText("NO RECORDS FOUND", 500, 240);
+                else if (leaderboardStatus === "ERROR") { ctx.fillStyle = C64.RED; ctx.fillText("IO ERROR", 500, 220); }
+                else if (leaderboardStatus === "EMPTY") ctx.fillText("NO RECORDS FOUND", 500, 240);
                 else {
                     highScores.forEach((s, i) => {
-                        ctx.textAlign = "left";
-                        ctx.fillStyle = i === 0 ? C64.YELLOW : C64.WHITE;
+                        ctx.textAlign = "left"; ctx.fillStyle = i === 0 ? C64.YELLOW : C64.WHITE;
                         ctx.fillText(`${(i+1).toString().padStart(2, '0')} ${s.name}`, 260, 160 + i * 28);
-                        ctx.textAlign = "right";
-                        ctx.fillText(`$${formatScore(s.score)}`, 740, 160 + i * 28);
+                        ctx.textAlign = "right"; ctx.fillText(`$${formatScore(s.score)}`, 740, 160 + i * 28);
                     });
                 }
-                if (!gameActive) {
-                    ctx.textAlign = "center";
-                    ctx.fillStyle = C64.LIGHT_GREEN;
-                    ctx.fillText("PRESS [R] FOR RE-DROP", 500, 430);
-                }
+                if (!gameActive) { ctx.textAlign = "center"; ctx.fillStyle = C64.LIGHT_GREEN; ctx.fillText("PRESS [R] FOR RE-DROP", 500, 430); }
             }
         }
 
         function loop(time) { const dt = Math.min(time - lastTime, 50); lastTime = time; update(dt); draw(); animationFrameId = requestAnimationFrame(loop); }
         function gameOver() { 
             if (!gameActive) return; 
-            gameActive = false; 
-            sfx.death(); 
-            checkHighScore(); 
+            gameActive = false; sfx.death(); checkHighScore(); 
             if (!enteringScore) { 
                 showMsg("<span style='color:" + C64.LIGHT_RED + ";'>*** FATAL ERROR ***</span><br><br>BUFFER OVERFLOW AT $D012<br>PARITY CHECK FAILED.<br><br>READY.<br>█"); 
-                showLeaderboard = true; 
-                fetchScores(); 
+                showLeaderboard = true; fetchScores(); 
             } 
         }
-        
         function extract() { 
             if (wallet >= EXTRACT_THRESHOLD && gameActive) { 
                 const fee = Math.max(0, 500 - (augments.uplink * 100));
-                bank += (wallet - fee); 
-                saveGame();
+                bank += (wallet - fee); saveGame();
                 let f = wallet; wallet = 0; sfx.win(); updateUI(); gameActive = false; 
                 checkHighScore(f); 
                 if (!enteringScore) { 
@@ -1033,60 +1037,29 @@
                 } 
             } 
         }
-
-        // Add a C64-style boot message on startup
-        window.addEventListener('load', () => {
-            showMsg("<span style='color:" + C64.WHITE + ";'>**** COMMODORE 64 BASIC V2 ****</span><br><br> 64K RAM SYSTEM  38911 BASIC BYTES FREE<br><br>READY.<br>█");
-            showLeaderboard = true;
-        });
-
+        window.addEventListener('load', () => { showMsg("<span style='color:" + C64.WHITE + ";'>**** COMMODORE 64 BASIC V2 ****</span><br><br> 64K RAM SYSTEM  38911 BASIC BYTES FREE<br><br>READY.<br>█"); showLeaderboard = true; });
         let pendingScore = 0;
         function checkHighScore(s = wallet, forced = false) { 
-            pendingScore = s; 
-            isRetiring = forced;
+            pendingScore = s; isRetiring = forced;
             const isHighScore = forced || (s > 0 && (leaderboardStatus !== "READY" || highScores.length < 10 || s > highScores[highScores.length - 1]?.score));
-            if (isHighScore) { 
-                enteringScore = true; 
-                initialsOverlay.style.display = "block"; 
-                charIndex = 0; 
-                updateInitialsDisplay(); 
-            } 
+            if (isHighScore) { enteringScore = true; initialsOverlay.style.display = "block"; charIndex = 0; updateInitialsDisplay(); } 
         }
         function updateInitialsDisplay() { for(let i=0; i<3; i++) { const el = document.getElementById('l' + i); el.innerText = currentInitials[i]; el.classList.toggle('active', i === charIndex); } }
         async function saveScore() { 
             const n = currentInitials.join(''); 
             const success = await submitScore(n, pendingScore); 
             if (success) {
-                if (isRetiring) {
-                    bank = 0;
-                    augments = { tether: 0, kinetic: 0, uplink: 0 };
-                    localStorage.setItem('exoborn_archive', 0);
-                    localStorage.setItem('exoborn_augments', JSON.stringify(augments));
-                    applyAugments(); // Reset physical unit stats immediately
-                    updateUI();
-                }
-                enteringScore = false; 
-                isRetiring = false;
-                initialsOverlay.style.display = "none"; 
-                showLeaderboard = true; 
+                if (isRetiring) { bank = 0; augments = { tether: 0, kinetic: 0, uplink: 0 }; localStorage.setItem('exoborn_archive', 0); localStorage.setItem('exoborn_augments', JSON.stringify(augments)); applyAugments(); updateUI(); }
+                enteringScore = false; isRetiring = false; initialsOverlay.style.display = "none"; showLeaderboard = true; 
                 showMsg("<span style='color:#ffb000;'>RECORD FINALIZED</span><br><br>Operative " + n + " retired.<br><br>[R] FOR NEW DROP"); 
-            } else {
-                showMsg("<span style='color:#ff5500;'>ARCHIVE FAILED</span><br><br>System link lost.<br><br>[SPACE] TO RETRY");
-            }
+            } else showMsg("<span style='color:#ff5500;'>ARCHIVE FAILED</span><br><br>System link lost.<br><br>[SPACE] TO RETRY");
         }
         function showMsg(t) { msgEl.innerHTML = t; msgEl.style.display = "block"; }
-
         function toggleShop() {
             if (gameActive || enteringScore) return;
-            if (shopOverlay.style.display === "block") {
-                shopOverlay.style.display = "none";
-            } else {
-                renderShop();
-                shopOverlay.style.display = "block";
-                msgEl.style.display = "none";
-            }
+            if (shopOverlay.style.display === "block") shopOverlay.style.display = "none";
+            else { renderShop(); shopOverlay.style.display = "block"; msgEl.style.display = "none"; }
         }
-
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
             if (enteringScore) {
@@ -1095,50 +1068,54 @@
                 if (e.code === 'Space' || e.code === 'Enter') { if (charIndex < 2) charIndex++; else saveScore(); }
                 updateInitialsDisplay(); return;
             }
-            if (shopOverlay.style.display === "block") {
-                if (e.code === 'Space') initLevel();
-                if (e.code === 'Escape') toggleShop();
-                return;
-            }
+            if (shopOverlay.style.display === "block") { if (e.code === 'Space') initLevel(); if (e.code === 'Escape') toggleShop(); return; }
             if ((e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') && gameActive) jumpBuffer = 200;
             if ((e.code === 'ArrowDown' || e.code === 'KeyS') && gameActive && !player.hook.active) player.isDucking = true;
             if (e.code === 'KeyE') extract();
-            if (e.code === 'KeyR' && !enteringScore) {
-                if (isBankrupt) {
-                    fullReset();
-                } else if (!gameActive) {
-                    toggleShop();
+            if (e.code === 'KeyR' && !enteringScore) { if (isBankrupt) fullReset(); else if (!gameActive) toggleShop(); }
+        });
+        window.addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'ArrowDown' || e.code === 'KeyS') player.isDucking = false; if ((e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') && player.vy < -5) player.vy *= 0.5; });
+        
+        // --- TACTICAL TELEMETRY MOUSE LOGIC ---
+        canvas.addEventListener('mousemove', e => {
+            if (!gameActive || enteringScore) return;
+            
+            const r = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / r.width;
+            const scaleY = canvas.height / r.height;
+            mouse.x = (e.clientX - r.left) * scaleX;
+            mouse.y = (e.clientY - r.top) * scaleY;
+
+            mouse.isHovering = false;
+            mouse.activeTarget = null;
+            
+            for (let p of platforms) {
+                if (mouse.x >= p.x && mouse.x <= p.x + p.w && mouse.y >= p.y && mouse.y <= p.y + p.h) {
+                    mouse.isHovering = true;
+                    mouse.activeTarget = p;
+                    break;
                 }
             }
         });
-        window.addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'ArrowDown' || e.code === 'KeyS') player.isDucking = false; if ((e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') && player.vy < -5) player.vy *= 0.5; });
+
         canvas.addEventListener('mousedown', e => {
             if (!gameActive || enteringScore) return;
             const r = canvas.getBoundingClientRect();
             const scaleX = canvas.width / r.width, scaleY = canvas.height / r.height;
             const tX = (e.clientX - r.left) * scaleX, tY = (e.clientY - r.top) * scaleY;
             let targetPlatform = null;
-            for (let p of platforms) {
-                if (tX >= p.x && tX <= p.x + p.w && tY >= p.y && tY <= p.y + p.h) { targetPlatform = p; break; }
-            }
+            for (let p of platforms) if (tX >= p.x && tX <= p.x + p.w && tY >= p.y && tY <= p.y + p.h) { targetPlatform = p; break; }
             if (targetPlatform) {
-                sfx.hook();
-                const anchorX = tX;
-                const anchorY = targetPlatform.y;
-                player.hook.x = anchorX;
-                player.hook.y = anchorY;
-                player.hook.anchorPlatform = targetPlatform;
-                player.hook.anchorOffsetX = anchorX - targetPlatform.x;
+                sfx.hook(); const anchorX = tX, anchorY = targetPlatform.y;
+                player.hook.x = anchorX; player.hook.y = anchorY; player.hook.anchorPlatform = targetPlatform;
+                player.hook.anchorOffsetX = anchorX - targetPlatform.x; player.hook.anchorOffsetY = anchorY - targetPlatform.y;
                 const dx = (player.x + player.w / 2) - anchorX, dy = (player.y + player.h / 2) - anchorY;
-                player.hook.length = Math.min(Math.sqrt(dx * dx + dy * dy), HOOK_MAX_LENGTH);
-                player.hook.active = true;
+                player.hook.length = Math.min(Math.sqrt(dx * dx + dy * dy), HOOK_MAX_LENGTH); player.hook.active = true;
             }
         });
         canvas.addEventListener('mouseup', () => player.hook.active = false);
         for(let i=0; i<3; i++) for(let j=0; j<12; j++) bgLayers[i].elements.push({ x: j * (canvas.width/6) + Math.random() * 50, y: 50 + Math.random() * 350, w: 20 + Math.random() * 80, h: 100 + Math.random() * 500 });
-        
-        bankEl.innerText = formatScore(bank);
-        fetchScores(); requestAnimationFrame(loop);
+        bankEl.innerText = formatScore(bank); fetchScores(); requestAnimationFrame(loop);
     </script>
 </body>
 </html>
