@@ -12,23 +12,34 @@
             --retro-white: #fff5e0;
             --tier-2: #00d4ff;
             --tier-3: #ff00ff;
+            --extract-ready: #00ff44;
         }
         body { background: var(--retro-black); color: var(--retro-yellow); font-family: 'Press Start 2P', cursive; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
         #ui { width: 1000px; display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 2px solid var(--retro-yellow); padding-bottom: 10px; text-shadow: 0 0 10px var(--retro-yellow); font-size: 12px; }
         canvas { border: 4px solid var(--retro-dim); background: #080700; box-shadow: 0 0 40px rgba(255, 176, 0, 0.2); cursor: crosshair; image-rendering: pixelated; }
         .controls { margin-top: 25px; font-size: 10px; color: var(--retro-white); text-align: center; line-height: 2; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 0 5px var(--retro-yellow); }
-        #initials-overlay { position: absolute; background: rgba(5,4,0,0.98); border: 4px solid var(--retro-yellow); padding: 50px; display: none; text-align: center; z-index: 100; box-shadow: 0 0 150px #000; color: var(--retro-yellow); }
+        #initials-overlay, #shop-overlay { position: absolute; background: rgba(5,4,0,0.98); border: 4px solid var(--retro-yellow); padding: 50px; display: none; text-align: center; z-index: 100; box-shadow: 0 0 150px #000; color: var(--retro-yellow); }
+        #shop-overlay { width: 600px; }
         .letter { font-size: 40px; margin: 0 15px; display: inline-block; width: 40px; border-bottom: 6px solid var(--retro-yellow); padding-bottom: 10px; }
         .letter.active { color: var(--retro-white); border-color: var(--retro-white); animation: blink 0.4s infinite; }
+        .shop-item { display: flex; justify-content: space-between; align-items: center; margin: 20px 0; padding: 10px; border: 1px solid var(--retro-dim); font-size: 10px; cursor: pointer; }
+        .shop-item:hover { border-color: var(--retro-yellow); background: rgba(255,176,0,0.1); }
+        .shop-item.maxed { color: var(--retro-dim); cursor: default; }
         @keyframes blink { 50% { opacity: 0; } }
         #msg { position: absolute; color: var(--retro-white); background: rgba(5,4,0,0.95); padding: 30px; display: none; text-align: center; border: 4px solid var(--retro-yellow); max-width: 600px; line-height: 2; box-shadow: 0 0 50px rgba(255,176,0,0.3); font-size: 12px; z-index: 50; }
+        .extract-glow { color: var(--extract-ready) !important; text-shadow: 0 0 15px var(--extract-ready) !important; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
     </style>
 </head>
 <body>
     <div id="ui">
-        <div>BANK: $<span id="bank">0</span></div>
+        <div>ARCHIVE: $<span id="bank">0</span></div>
         <div style="color: var(--retro-white); font-weight: bold; letter-spacing: 4px;">EXOBÖRN</div>
-        <div>CURR: $<span id="current">0</span></div>
+        <div>BUFFER: $<span id="current">0</span></div>
+    </div>
+    <div id="sys-monitor" style="width: 1000px; display: flex; justify-content: flex-end; margin-bottom: 5px; font-size: 7px; color: var(--retro-dim);">
+        <span id="ping-stats">UPLINK: <span id="ping-val">---</span>ms</span>&nbsp;|&nbsp;
+        <span id="signal-stats">SIGNAL: <span id="signal-val">DISCONNECTED</span></span>
     </div>
     <canvas id="gameCanvas" width="1000" height="500"></canvas>
     <div id="msg"></div>
@@ -42,9 +53,15 @@
         </div>
         <p style="font-size: 8px; margin-top: 50px; color: var(--retro-dim);">[UP/DOWN] CYCLE | [SPACE] LOCK</p>
     </div>
+    <div id="shop-overlay">
+        <h2 style="color: var(--retro-white); margin-top: 0; font-size: 18px; margin-bottom: 20px;">AUGMENTATION BAY</h2>
+        <p style="font-size: 8px; margin-bottom: 30px; color: var(--retro-dim);">SPEND ARCHIVED CREDITS TO ENHANCE UNIT</p>
+        <div id="shop-items"></div>
+        <p style="font-size: 8px; margin-top: 30px; color: var(--retro-white);">[SPACE] DEPLOY UNIT | [ESC] CLOSE</p>
+    </div>
     <div class="controls">
         <span style="color: var(--retro-yellow)">W/SPACE/UP:</span> JUMP | <span style="color: var(--retro-yellow)">A/D or LEFT/RIGHT:</span> MOVE | <span style="color: var(--retro-yellow)">S/DOWN:</span> DUCK/SLIDE | <span style="color: var(--retro-yellow)">CLICK PLATFORM:</span> GRAPPLE <br>
-        <span style="color: var(--retro-yellow)">W/S (HOOKED):</span> REEL IN/OUT | <span style="color: var(--retro-yellow)">E:</span> EXTRACT ($5000+) | <span style="color: var(--retro-yellow)">R:</span> DEPLOY
+        <span style="color: var(--retro-yellow)">W/S (HOOKED):</span> REEL IN/OUT | <span style="color: var(--retro-yellow)">E:</span> UPLINK DATA ($2000+) | <span style="color: var(--retro-yellow)">R:</span> SHOP/AUGMENT
     </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -53,10 +70,92 @@
         const currentEl = document.getElementById('current');
         const msgEl = document.getElementById('msg');
         const initialsOverlay = document.getElementById('initials-overlay');
+        const shopOverlay = document.getElementById('shop-overlay');
+        const shopItemsEl = document.getElementById('shop-items');
+        const pingValEl = document.getElementById('ping-val');
+        const signalValEl = document.getElementById('signal-val');
 
         const API_URL = 'scores.php'; 
 
+        // --- DEVOPS TELEMETRY ---
+        let isOnline = false;
+
+        async function monitorUplink() {
+            const start = performance.now();
+            try {
+                const res = await fetch(API_URL + "?health=1&t=" + Date.now());
+                const end = performance.now();
+                if (res.ok) {
+                    const latency = Math.round(end - start);
+                    pingValEl.innerText = latency;
+                    signalValEl.innerText = "NOMINAL";
+                    signalValEl.style.color = "var(--extract-ready)";
+                    isOnline = true;
+                } else throw new Error();
+            } catch (e) {
+                pingValEl.innerText = "---";
+                signalValEl.innerText = "OFFLINE";
+                signalValEl.style.color = "#ff5500";
+                isOnline = false;
+            }
+            setTimeout(monitorUplink, 10000); // Heartbeat every 10s
+        }
+        monitorUplink();
+
+        // --- PERSISTENCE ---
+        let bank = parseInt(localStorage.getItem('exoborn_archive')) || 0;
+        let augments = JSON.parse(localStorage.getItem('exoborn_augments')) || {
+            tether: 0, // max 5
+            kinetic: 0, // max 5
+            uplink: 0  // max 5
+        };
+
+        function saveGame() {
+            localStorage.setItem('exoborn_archive', bank);
+            localStorage.setItem('exoborn_augments', JSON.stringify(augments));
+            updateUI();
+        }
+
+        const SHOP_CONFIG = [
+            { id: 'tether', name: 'LONG-RANGE TETHER', baseCost: 1000, desc: 'Increases grapple distance' },
+            { id: 'kinetic', name: 'KINETIC COMPENSATOR', baseCost: 1500, desc: 'Increases jump power' },
+            { id: 'uplink', name: 'FAST UPLINK', baseCost: 2000, desc: 'Reduces extraction fee' }
+        ];
+
+        function renderShop() {
+            shopItemsEl.innerHTML = '';
+            SHOP_CONFIG.forEach(item => {
+                const level = augments[item.id];
+                const cost = item.baseCost * (level + 1);
+                const isMaxed = level >= 5;
+                const div = document.createElement('div');
+                div.className = `shop-item ${isMaxed ? 'maxed' : ''}`;
+                div.innerHTML = `
+                    <div style="text-align: left;">
+                        <div style="font-weight: bold; margin-bottom: 5px;">${item.name} [LVL ${level}]</div>
+                        <div style="font-size: 7px; color: var(--retro-dim);">${item.desc}</div>
+                    </div>
+                    <div>${isMaxed ? 'MAXED' : '$' + formatScore(cost)}</div>
+                `;
+                if (!isMaxed) {
+                    div.onclick = () => {
+                        if (bank >= cost) {
+                            bank -= cost;
+                            augments[item.id]++;
+                            saveGame();
+                            renderShop();
+                            sfx.win();
+                        } else {
+                            playSfx(100, 'sawtooth', 0.2, 0, 0.5); // fail sfx
+                        }
+                    };
+                }
+                shopItemsEl.appendChild(div);
+            });
+        }
+
         // --- AUDIO ENGINE ---
+        // ... (audio engine code remains the same)
         let audioCtx = null;
         let mainGain = null;
         let musicGain = null;
@@ -152,7 +251,6 @@
         };
 
         // --- GAME LOGIC ---
-        let bank = 0;
         let wallet = 0;
         let gameActive = false;
         let animationFrameId;
@@ -164,11 +262,11 @@
         const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?#";
 
         const GRAVITY = 0.52;
-        const JUMP_POWER = -12.5;
+        let JUMP_POWER = -12.5;
         const AIR_FRICTION = 0.992;
         const GROUND_FRICTION = 0.84;
         const SWING_BOOST = 0.55;
-        const HOOK_MAX_LENGTH = 300;
+        let HOOK_MAX_LENGTH = 300;
         const HOOK_REEL_SPEED = 1.5;
         const HOOK_DAMPING = 0.995;
 
@@ -204,6 +302,7 @@
         let highScores = [];
         let leaderboardStatus = "LOADING"; 
         let lastError = "";
+        let isSubmitting = false;
 
         async function fetchScores() {
             leaderboardStatus = "LOADING";
@@ -224,22 +323,37 @@
         }
 
         async function submitScore(name, score) {
+            if (isSubmitting) return false;
+            isSubmitting = true;
             try {
+                const token = btoa(name + ":" + score + ":" + (score * 7 + 123));
                 const res = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, score })
+                    body: JSON.stringify({ name, score, token })
                 });
+                if (!res.ok) throw new Error("Server Error");
                 highScores = await res.json();
                 leaderboardStatus = "READY";
+                return true;
             } catch (err) {
+                console.error("Submission failed:", err);
                 leaderboardStatus = "ERROR";
                 lastError = "Save Failed";
+                return false;
+            } finally {
+                isSubmitting = false;
             }
+        }
+
+        function applyAugments() {
+            HOOK_MAX_LENGTH = 300 + (augments.tether * 40);
+            JUMP_POWER = -12.5 - (augments.kinetic * 0.4);
         }
 
         function initLevel() {
             initAudio();
+            applyAugments();
             platforms = [{ x: 0, y: 450, w: 1200, h: 50 }];
             lastPlatformEndX = 1200; lastPlatformY = 450;
             items = []; obstacles = [];
@@ -251,6 +365,7 @@
             scrollSpeed = baseSpeed; updateUI();
             gameActive = true; enteringScore = false; showLeaderboard = false;
             msgEl.style.display = "none"; initialsOverlay.style.display = "none";
+            shopOverlay.style.display = "none";
             lastTime = performance.now();
         }
 
@@ -260,10 +375,19 @@
             return n.toLocaleString();
         }
 
+        const EXTRACT_THRESHOLD = 2000;
+
         function updateUI() {
             currentEl.innerText = formatScore(wallet);
             bankEl.innerText = formatScore(bank);
-            // Logarithmic speed curve with cap — collecting loot ramps difficulty gently, not punitively
+            
+            // Visual feedback for extraction availability
+            if (wallet >= EXTRACT_THRESHOLD) {
+                currentEl.classList.add('extract-glow');
+            } else {
+                currentEl.classList.remove('extract-glow');
+            }
+
             const rawBoost = Math.log2(1 + wallet / 3000) * 1.8;
             const maxBoost = 4.5;
             scrollSpeed = gameActive ? baseSpeed + Math.min(rawBoost, maxBoost) : baseSpeed;
@@ -469,7 +593,7 @@
                     ctx.fillText("CLOSE CALL +$100", player.x + player.w / 2, dY - 10);
                 }
             }
-            if (showLeaderboard && !enteringScore) {
+            if (showLeaderboard && !enteringScore && shopOverlay.style.display !== "block") {
                 ctx.fillStyle = "rgba(5, 4, 0, 0.9)"; ctx.fillRect(250, 60, 500, 380);
                 ctx.strokeStyle = "#ffb000"; ctx.lineWidth = 4; ctx.strokeRect(250, 60, 500, 380);
                 ctx.fillStyle = "#ffb000"; ctx.font = "16px 'Press Start 2P'"; ctx.textAlign = "center";
@@ -486,18 +610,64 @@
                         ctx.textAlign = "right"; ctx.fillText(`$${formatScore(s.score)}`, 700, 160 + i * 26);
                     });
                 }
-                if (!gameActive) { ctx.textAlign = "center"; ctx.fillStyle = "#fff5e0"; ctx.fillText("PRESS [R] TO DEPLOY", 500, 410); }
+                if (!gameActive) { ctx.textAlign = "center"; ctx.fillStyle = "#fff5e0"; ctx.fillText("PRESS [R] FOR SHOP", 500, 410); }
             }
         }
 
         function loop(time) { const dt = Math.min(time - lastTime, 50); lastTime = time; update(dt); draw(); animationFrameId = requestAnimationFrame(loop); }
-        function gameOver() { if (!gameActive) return; gameActive = false; sfx.death(); checkHighScore(); if (!enteringScore) { showMsg("<span style='color:#ff5500; font-size: 16px;'>SYSTEM FAILURE</span><br><br>Unit destroyed. Data scrubbed.<br><br>[R] TO REBOOT"); showLeaderboard = true; fetchScores(); } }
-        function extract() { if (wallet >= 5000 && gameActive) { bank += (wallet - 500); let f = wallet; wallet = 0; sfx.win(); updateUI(); gameActive = false; checkHighScore(f); if (!enteringScore) { showMsg("<span style='color:#ffb000; font-size: 16px;'>EXTRACTION COMPLETE</span><br><br>Security fee: $500.<br><br>[R] FOR NEW DROP"); showLeaderboard = true; fetchScores(); } } }
+        function gameOver() { if (!gameActive) return; gameActive = false; sfx.death(); checkHighScore(); if (!enteringScore) { showMsg("<span style='color:#ff5500; font-size: 16px;'>SYSTEM FAILURE</span><br><br>Buffer purged. Data lost.<br><br>[R] TO REBOOT"); showLeaderboard = true; fetchScores(); } }
+        
+        function extract() { 
+            if (wallet >= EXTRACT_THRESHOLD && gameActive) { 
+                const fee = Math.max(0, 500 - (augments.uplink * 100));
+                bank += (wallet - fee); 
+                saveGame();
+                let f = wallet; wallet = 0; sfx.win(); updateUI(); gameActive = false; 
+                checkHighScore(f); 
+                if (!enteringScore) { 
+                    showMsg("<span style='color:#ffb000; font-size: 16px;'>UPLINK COMPLETE</span><br><br>Security fee: $" + fee + ".<br><br>[R] FOR SHOP"); 
+                    showLeaderboard = true; fetchScores(); 
+                } 
+            } 
+        }
+
         let pendingScore = 0;
-        function checkHighScore(s = wallet) { pendingScore = s; if (s > 0 && (highScores.length < 10 || s > highScores[highScores.length - 1]?.score)) { enteringScore = true; initialsOverlay.style.display = "block"; charIndex = 0; updateInitialsDisplay(); } }
+        function checkHighScore(s = wallet) { 
+            pendingScore = s; 
+            const isHighScore = s > 0 && (leaderboardStatus !== "READY" || highScores.length < 10 || s > highScores[highScores.length - 1]?.score);
+            if (isHighScore) { 
+                enteringScore = true; 
+                initialsOverlay.style.display = "block"; 
+                charIndex = 0; 
+                updateInitialsDisplay(); 
+            } 
+        }
         function updateInitialsDisplay() { for(let i=0; i<3; i++) { const el = document.getElementById('l' + i); el.innerText = currentInitials[i]; el.classList.toggle('active', i === charIndex); } }
-        async function saveScore() { const n = currentInitials.join(''); await submitScore(n, pendingScore); enteringScore = false; initialsOverlay.style.display = "none"; showLeaderboard = true; showMsg("<span style='color:#ffb000;'>DATA ARCHIVED</span><br><br>Operative " + n + " logged.<br><br>[R] TO REBOOT"); }
+        async function saveScore() { 
+            const n = currentInitials.join(''); 
+            const success = await submitScore(n, pendingScore); 
+            if (success) {
+                enteringScore = false; 
+                initialsOverlay.style.display = "none"; 
+                showLeaderboard = true; 
+                showMsg("<span style='color:#ffb000;'>DATA ARCHIVED</span><br><br>Operative " + n + " logged.<br><br>[R] FOR SHOP"); 
+            } else {
+                showMsg("<span style='color:#ff5500;'>ARCHIVE FAILED</span><br><br>System link lost.<br><br>[SPACE] TO RETRY");
+            }
+        }
         function showMsg(t) { msgEl.innerHTML = t; msgEl.style.display = "block"; }
+
+        function toggleShop() {
+            if (gameActive || enteringScore) return;
+            if (shopOverlay.style.display === "block") {
+                shopOverlay.style.display = "none";
+            } else {
+                renderShop();
+                shopOverlay.style.display = "block";
+                msgEl.style.display = "none";
+            }
+        }
+
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
             if (enteringScore) {
@@ -506,10 +676,17 @@
                 if (e.code === 'Space' || e.code === 'Enter') { if (charIndex < 2) charIndex++; else saveScore(); }
                 updateInitialsDisplay(); return;
             }
+            if (shopOverlay.style.display === "block") {
+                if (e.code === 'Space') initLevel();
+                if (e.code === 'Escape') toggleShop();
+                return;
+            }
             if ((e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') && gameActive) jumpBuffer = 200;
             if ((e.code === 'ArrowDown' || e.code === 'KeyS') && gameActive && !player.hook.active) player.isDucking = true;
             if (e.code === 'KeyE') extract();
-            if (e.code === 'KeyR' && (!gameActive || !showLeaderboard) && !enteringScore) initLevel();
+            if (e.code === 'KeyR' && !enteringScore) {
+                if (!gameActive) toggleShop();
+            }
         });
         window.addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'ArrowDown' || e.code === 'KeyS') player.isDucking = false; if ((e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') && player.vy < -5) player.vy *= 0.5; });
         canvas.addEventListener('mousedown', e => {
@@ -523,7 +700,6 @@
             }
             if (targetPlatform) {
                 sfx.hook();
-                // Anchor to the top edge of the platform at click X
                 const anchorX = tX;
                 const anchorY = targetPlatform.y;
                 player.hook.x = anchorX;
@@ -533,11 +709,12 @@
                 const dx = (player.x + player.w / 2) - anchorX, dy = (player.y + player.h / 2) - anchorY;
                 player.hook.length = Math.min(Math.sqrt(dx * dx + dy * dy), HOOK_MAX_LENGTH);
                 player.hook.active = true;
-                // No arbitrary impulse — the pendulum physics handle momentum naturally
             }
         });
         canvas.addEventListener('mouseup', () => player.hook.active = false);
         for(let i=0; i<3; i++) for(let j=0; j<12; j++) bgLayers[i].elements.push({ x: j * (canvas.width/6) + Math.random() * 50, y: 50 + Math.random() * 350, w: 20 + Math.random() * 80, h: 100 + Math.random() * 500 });
+        
+        bankEl.innerText = formatScore(bank);
         fetchScores(); requestAnimationFrame(loop);
     </script>
 </body>
