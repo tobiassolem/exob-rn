@@ -6,64 +6,194 @@
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         :root {
-            --retro-yellow: #ffb000;
-            --retro-dim: #664400;
-            --retro-black: #050400;
-            --retro-white: #fff5e0;
-            --tier-2: #00d4ff;
-            --tier-3: #ff00ff;
-            --extract-ready: #00ff44;
+            /* Commodore 64 Palette */
+            --c64-black: #000000;
+            --c64-white: #FFFFFF;
+            --c64-red: #880000;
+            --c64-cyan: #AAFFEE;
+            --c64-purple: #CC44CC;
+            --c64-green: #00CC55;
+            --c64-blue: #0000AA;
+            --c64-yellow: #EEEE77;
+            --c64-orange: #DD8855;
+            --c64-brown: #664400;
+            --c64-light-red: #FF7777;
+            --c64-dark-grey: #333333;
+            --c64-grey: #777777;
+            --c64-light-green: #AAFF66;
+            --c64-light-blue: #0088FF;
+            --c64-light-grey: #BBBBBB;
+
+            /* Game semantic mapping */
+            --retro-yellow: var(--c64-yellow);
+            --retro-dim: var(--c64-grey);
+            --retro-black: var(--c64-black);
+            --retro-white: var(--c64-white);
+            --tier-2: var(--c64-cyan);
+            --tier-3: var(--c64-purple);
+            --extract-ready: var(--c64-light-green);
         }
-        body { background: var(--retro-black); color: var(--retro-yellow); font-family: 'Press Start 2P', cursive; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        #ui { width: 1000px; display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 2px solid var(--retro-yellow); padding-bottom: 10px; text-shadow: 0 0 10px var(--retro-yellow); font-size: 12px; }
-        canvas { border: 4px solid var(--retro-dim); background: #080700; box-shadow: 0 0 40px rgba(255, 176, 0, 0.2); cursor: crosshair; image-rendering: pixelated; }
-        .controls { margin-top: 25px; font-size: 10px; color: var(--retro-white); text-align: center; line-height: 2; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 0 5px var(--retro-yellow); }
-        #initials-overlay, #shop-overlay { position: absolute; background: rgba(5,4,0,0.98); border: 4px solid var(--retro-yellow); padding: 50px; display: none; text-align: center; z-index: 100; box-shadow: 0 0 150px #000; color: var(--retro-yellow); }
-        #shop-overlay { width: 600px; }
-        .letter { font-size: 40px; margin: 0 15px; display: inline-block; width: 40px; border-bottom: 6px solid var(--retro-yellow); padding-bottom: 10px; }
-        .letter.active { color: var(--retro-white); border-color: var(--retro-white); animation: blink 0.4s infinite; }
-        .shop-item { display: flex; justify-content: space-between; align-items: center; margin: 20px 0; padding: 10px; border: 1px solid var(--retro-dim); font-size: 10px; cursor: pointer; }
-        .shop-item:hover { border-color: var(--retro-yellow); background: rgba(255,176,0,0.1); }
-        .shop-item.maxed { color: var(--retro-dim); cursor: default; }
+        body { 
+            background: var(--c64-light-blue); 
+            color: var(--c64-light-blue); 
+            font-family: 'Press Start 2P', cursive; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            margin: 0; 
+            overflow: hidden; 
+        }
+        #monitor-frame {
+            background: var(--c64-light-blue);
+            padding: 40px;
+            border: 20px solid #a5a5a5; /* Monitor plastic */
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.5), 0 20px 50px rgba(0,0,0,0.8);
+            position: relative;
+        }
+        #ui { 
+            width: 1000px; 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 20px; 
+            border-bottom: 4px solid var(--c64-light-blue); 
+            padding-bottom: 10px; 
+            color: var(--c64-white);
+            text-shadow: 2px 2px var(--c64-blue);
+            font-size: 14px; 
+        }
+        .canvas-container {
+            position: relative;
+            line-height: 0;
+        }
+        canvas { 
+            background: var(--c64-blue); 
+            image-rendering: pixelated; 
+            width: 1000px;
+            height: 500px;
+        }
+        /* CRT/Pixel Grid Overlay Effects */
+        .pixel-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(rgba(0, 0, 0, 0.2) 1px, transparent 1px), 
+                        linear-gradient(90deg, rgba(0, 0, 0, 0.2) 1px, transparent 1px);
+            background-size: 3px 3px;
+            pointer-events: none;
+            z-index: 10; /* Above canvas, below some UI if needed, but usually looks best on top */
+            opacity: 0.6;
+        }
+        .crt::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: radial-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 100%), rgba(18, 16, 16, 0.1);
+            z-index: 11;
+            pointer-events: none;
+        }
+        .controls { 
+            margin-top: 25px; 
+            font-size: 10px; 
+            color: var(--c64-white); 
+            text-align: center; 
+            line-height: 2; 
+            text-transform: uppercase; 
+            text-shadow: 2px 2px var(--c64-blue);
+        }
+        #initials-overlay, #shop-overlay { 
+            position: absolute; 
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--c64-blue); 
+            border: 8px solid var(--c64-light-blue); 
+            padding: 50px; 
+            display: none; 
+            text-align: center; 
+            z-index: 100; 
+            color: var(--c64-light-blue); 
+            box-shadow: 0 0 0 4px var(--c64-blue);
+        }
+        #shop-overlay { width: 700px; }
+        .letter { font-size: 40px; margin: 0 15px; display: inline-block; width: 40px; border-bottom: 6px solid var(--c64-light-blue); padding-bottom: 10px; }
+        .letter.active { color: var(--c64-white); border-color: var(--c64-white); animation: blink 0.4s infinite; }
+        .shop-item { display: flex; justify-content: space-between; align-items: center; margin: 20px 0; padding: 15px; border: 4px solid var(--c64-light-blue); font-size: 12px; cursor: pointer; background: var(--c64-blue); color: var(--c64-light-blue); }
+        .shop-item:hover { background: var(--c64-light-blue); color: var(--c64-blue); }
+        .shop-item.maxed { color: var(--c64-dark-grey); border-color: var(--c64-dark-grey); cursor: default; }
         @keyframes blink { 50% { opacity: 0; } }
-        #msg { position: absolute; color: var(--retro-white); background: rgba(5,4,0,0.95); padding: 30px; display: none; text-align: center; border: 4px solid var(--retro-yellow); max-width: 600px; line-height: 2; box-shadow: 0 0 50px rgba(255,176,0,0.3); font-size: 12px; z-index: 50; }
-        .extract-glow { color: var(--extract-ready) !important; text-shadow: 0 0 15px var(--extract-ready) !important; animation: pulse 1s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        #msg { 
+            position: absolute; 
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--c64-white); 
+            background: var(--c64-blue); 
+            padding: 40px; 
+            display: none; 
+            text-align: center; 
+            border: 8px solid var(--c64-light-blue); 
+            max-width: 600px; 
+            line-height: 2; 
+            font-size: 14px; 
+            z-index: 50; 
+        }
+        .extract-glow { color: var(--c64-yellow) !important; animation: pulse 0.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <div>ARCHIVE: $<span id="bank">0</span></div>
-        <div style="color: var(--retro-white); font-weight: bold; letter-spacing: 4px;">EXOBÖRN</div>
-        <div>BUFFER: $<span id="current">0</span></div>
-    </div>
-    <div id="sys-monitor" style="width: 1000px; display: flex; justify-content: flex-end; margin-bottom: 5px; font-size: 7px; color: var(--retro-dim);">
-        <span id="ping-stats">UPLINK: <span id="ping-val">---</span>ms</span>&nbsp;|&nbsp;
-        <span id="signal-stats">SIGNAL: <span id="signal-val">DISCONNECTED</span></span>
-    </div>
-    <canvas id="gameCanvas" width="1000" height="500"></canvas>
-    <div id="msg"></div>
-    <div id="initials-overlay">
-        <h2 style="color: var(--retro-white); margin-top: 0; font-size: 18px; margin-bottom: 30px;">GLOBAL RECORD</h2>
-        <p style="font-size: 10px; margin-bottom: 40px;">IDENTIFY OPERATIVE</p>
-        <div id="initials-container">
-            <span class="letter active" id="l0">A</span>
-            <span class="letter" id="l1">A</span>
-            <span class="letter" id="l2">A</span>
+    <div id="monitor-frame">
+        <div id="ui">
+            <div>ARCHIVE: $<span id="bank">0</span></div>
+            <div style="color: var(--c64-white); font-weight: bold; letter-spacing: 4px;">EXOBÖRN</div>
+            <div>BUFFER: $<span id="current">0</span></div>
         </div>
-        <p style="font-size: 8px; margin-top: 50px; color: var(--retro-dim);">[UP/DOWN] CYCLE | [SPACE] LOCK</p>
-    </div>
-    <div id="shop-overlay">
-        <h2 style="color: var(--retro-white); margin-top: 0; font-size: 18px; margin-bottom: 20px;">AUGMENTATION BAY</h2>
-        <p style="font-size: 8px; margin-bottom: 30px; color: var(--retro-dim);">SPEND ARCHIVED CREDITS TO ENHANCE UNIT</p>
-        <div id="shop-items"></div>
-        <p style="font-size: 8px; margin-top: 30px; color: var(--retro-white);">[SPACE] DEPLOY UNIT | [ESC] CLOSE</p>
+        <div id="sys-monitor" style="width: 1000px; display: flex; justify-content: flex-end; margin-bottom: 10px; font-size: 10px; color: var(--c64-blue); font-weight: bold;">
+            <span id="now-playing" style="margin-right: auto; color: var(--c64-white);">SIGNAL: ---</span>
+            <span id="ping-stats">UPLINK: <span id="ping-val">---</span>ms</span>&nbsp;|&nbsp;
+            <span id="signal-stats">STATUS: <span id="signal-val">DISCONNECTED</span></span>
+        </div>
+        <div class="canvas-container crt">
+            <div class="pixel-grid"></div>
+            <canvas id="gameCanvas" width="1000" height="500"></canvas>
+            <div id="msg"></div>
+            <div id="initials-overlay">
+                <h2 style="color: var(--c64-white); margin-top: 0; font-size: 24px; margin-bottom: 30px;">GLOBAL RECORD</h2>
+                <p style="font-size: 12px; margin-bottom: 40px; color: var(--c64-light-blue);">IDENTIFY OPERATIVE</p>
+                <div id="initials-container">
+                    <span class="letter active" id="l0">A</span>
+                    <span class="letter" id="l1">A</span>
+                    <span class="letter" id="l2">A</span>
+                </div>
+                <p style="font-size: 10px; margin-top: 50px; color: var(--c64-grey);">[UP/DOWN] CYCLE | [SPACE] LOCK</p>
+            </div>
+            <div id="shop-overlay">
+                <h2 style="color: var(--c64-white); margin-top: 0; font-size: 24px; margin-bottom: 20px;">AUGMENTATION BAY</h2>
+                <p id="deployment-info" style="font-size: 10px; margin-bottom: 20px; color: var(--c64-orange);"></p>
+                <div id="shop-items"></div>
+                <div style="margin-top: 20px; padding-top: 20px;">
+                    <button id="retire-btn" style="background: var(--c64-red); color: var(--c64-white); font-family: 'Press Start 2P'; font-size: 12px; padding: 20px; border: 4px solid var(--c64-light-red); cursor: pointer; width: 100%;">RETIRE OPERATIVE (SUBMIT TO LEADERBOARD)</button>
+                    <p style="font-size: 8px; color: var(--c64-grey); margin-top: 10px;">THIS WILL RESET ALL PROGRESS AND UPGRADES</p>
+                </div>
+                <p style="font-size: 10px; margin-top: 30px; color: var(--c64-white);">[SPACE] DEPLOY UNIT | [ESC] CLOSE</p>
+            </div>
+        </div>
     </div>
     <div class="controls">
         <span style="color: var(--retro-yellow)">W/SPACE/UP:</span> JUMP | <span style="color: var(--retro-yellow)">A/D or LEFT/RIGHT:</span> MOVE | <span style="color: var(--retro-yellow)">S/DOWN:</span> DUCK/SLIDE | <span style="color: var(--retro-yellow)">CLICK PLATFORM:</span> GRAPPLE <br>
         <span style="color: var(--retro-yellow)">W/S (HOOKED):</span> REEL IN/OUT | <span style="color: var(--retro-yellow)">E:</span> UPLINK DATA ($2000+) | <span style="color: var(--retro-yellow)">R:</span> SHOP/AUGMENT
     </div>
-    <script>
+    <script type="module">
+        import { SidPlayer } from './sidplayer.js';
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const bankEl = document.getElementById('bank');
@@ -74,6 +204,7 @@
         const shopItemsEl = document.getElementById('shop-items');
         const pingValEl = document.getElementById('ping-val');
         const signalValEl = document.getElementById('signal-val');
+        const nowPlayingEl = document.getElementById('now-playing');
 
         const API_URL = 'scores.php'; 
 
@@ -109,11 +240,22 @@
             kinetic: 0, // max 5
             uplink: 0  // max 5
         };
+        let isBankrupt = false;
 
         function saveGame() {
             localStorage.setItem('exoborn_archive', bank);
             localStorage.setItem('exoborn_augments', JSON.stringify(augments));
             updateUI();
+        }
+
+        function fullReset() {
+            bank = 0;
+            augments = { tether: 0, kinetic: 0, uplink: 0 };
+            saveGame();
+            applyAugments();
+            isBankrupt = false;
+            showMsg("<span style='color:" + C64.WHITE + ";'>**** SYSTEM REBOOT ****</span><br><br>MEMORY CLEARED.<br>ALL AUGMENTS PURGED.<br><br>READY.<br>█");
+            showLeaderboard = true;
         }
 
         const SHOP_CONFIG = [
@@ -124,6 +266,17 @@
 
         function renderShop() {
             shopItemsEl.innerHTML = '';
+            const deploymentFee = Math.floor(500 + (bank * 0.1));
+            const deploymentInfo = document.getElementById('deployment-info');
+            deploymentInfo.innerText = `NEXT DEPLOYMENT OVERHEAD: $${formatScore(deploymentFee)}`;
+            
+            if (bank < deploymentFee) {
+                deploymentInfo.style.color = "#ff0000";
+                deploymentInfo.innerText += " - INSUFFICIENT FUNDS";
+            } else {
+                deploymentInfo.style.color = "#ff5500";
+            }
+
             SHOP_CONFIG.forEach(item => {
                 const level = augments[item.id];
                 const cost = item.baseCost * (level + 1);
@@ -131,11 +284,11 @@
                 const div = document.createElement('div');
                 div.className = `shop-item ${isMaxed ? 'maxed' : ''}`;
                 div.innerHTML = `
-                    <div style="text-align: left;">
-                        <div style="font-weight: bold; margin-bottom: 5px;">${item.name} [LVL ${level}]</div>
-                        <div style="font-size: 7px; color: var(--retro-dim);">${item.desc}</div>
+                    <div style="text-align: left; display: flex; flex-direction: column; gap: 8px;">
+                        <div style="font-weight: bold;">${item.name} [LVL ${level}]</div>
+                        <div style="font-size: 10px; color: var(--retro-dim); line-height: 1.4;">${item.desc}</div>
                     </div>
-                    <div>${isMaxed ? 'MAXED' : '$' + formatScore(cost)}</div>
+                    <div style="white-space: nowrap; margin-left: 20px;">${isMaxed ? 'MAXED' : '$' + formatScore(cost)}</div>
                 `;
                 if (!isMaxed) {
                     div.onclick = () => {
@@ -146,108 +299,217 @@
                             renderShop();
                             sfx.win();
                         } else {
-                            playSfx(100, 'sawtooth', 0.2, 0, 0.5); // fail sfx
+                            // play fail sfx
+                            sidPoke(0x0E, 0x00); sidPoke(0x0F, 0x08);
+                            sidPoke(0x12, 0x21); 
+                            setTimeout(() => sidPoke(0x12, 0x20), 100);
                         }
                     };
                 }
                 shopItemsEl.appendChild(div);
             });
+
+            document.getElementById('retire-btn').onclick = () => {
+                if (confirm("SUBMIT ARCHIVE TO GLOBAL RECORD? UNIT WILL BE DISMANTLED.")) {
+                    shopOverlay.style.display = "none";
+                    checkHighScore(bank, true); // Force score entry with Archive total
+                }
+            };
         }
 
         // --- AUDIO ENGINE ---
-        // ... (audio engine code remains the same)
         let audioCtx = null;
         let mainGain = null;
-        let musicGain = null;
+        let sid = new SidPlayer();
+        let sfxSid = new SidPlayer(); // Dedicated Virtual SID for SFX
         let isMusicPlaying = false;
+        let sidList = [];
 
-        function initAudio() {
+        async function initAudio() {
             if (audioCtx) return;
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            await sid.initialise();
+            audioCtx = sid.audioCtx;
+            await sfxSid.initialise(audioCtx); // Share the context
+
             mainGain = audioCtx.createGain();
             mainGain.connect(audioCtx.destination);
             mainGain.gain.value = 0.3;
 
-            musicGain = audioCtx.createGain();
-            musicGain.connect(mainGain);
-            musicGain.gain.value = 0.2;
+            // Initialize Virtual SID Master Volume (0xD418) to max
+            sidPoke(0x18, 0x0F);
+
+            try {
+                const res = await fetch('get_sids.php');
+                sidList = await res.json();
+            } catch (e) {
+                console.warn("SID archive offline.");
+            }
+
             startMusic();
         }
 
-        function playSfx(freq, type, duration, slide = 0, volume = 1) {
-            if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const g = audioCtx.createGain();
-            osc.type = type;
-            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            if (slide) osc.frequency.exponentialRampToValueAtTime(freq + slide, audioCtx.currentTime + duration);
-            g.gain.setValueAtTime(volume, audioCtx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-            osc.connect(g);
-            g.connect(mainGain);
-            osc.start();
-            osc.stop(audioCtx.currentTime + duration);
-        }
+        // Direct SID register manipulation for authentic 8-bit SFX
+        function sidPoke(addr, val) { if (sfxSid.isReady) sfxSid.poke(0xD400 + addr, val); }
 
         function startMusic() {
-            if (isMusicPlaying) return;
+            if (isMusicPlaying || sidList.length === 0) return;
             isMusicPlaying = true;
-            const tempo = 140;
-            const step = 60 / tempo / 2;
-            let bar = 0;
-            
-            const bassline = [40, 40, 45, 40, 38, 38, 43, 40];
-            const lead = [null, 60, 64, 67, 72, 67, 64, 60, null, 62, 65, 69, 74, 69, 65, 62];
-
-            function playBar() {
-                for (let i = 0; i < 8; i++) {
-                    const time = audioCtx.currentTime + i * step;
-                    // Bass
-                    const bFreq = 440 * Math.pow(2, (bassline[bar % 8] - 69) / 12);
-                    const bOsc = audioCtx.createOscillator();
-                    const bG = audioCtx.createGain();
-                    bOsc.type = 'square';
-                    bOsc.frequency.setValueAtTime(bFreq, time);
-                    bG.gain.setValueAtTime(0.1, time);
-                    bG.gain.exponentialRampToValueAtTime(0.01, time + step * 0.8);
-                    bOsc.connect(bG);
-                    bG.connect(musicGain);
-                    bOsc.start(time);
-                    bOsc.stop(time + step);
-
-                    // Melody (Silly quirky lead)
-                    if (bar % 2 === 0 && Math.random() > 0.3) {
-                        const note = lead[Math.floor(Math.random() * lead.length)];
-                        if (note) {
-                            const lFreq = 440 * Math.pow(2, (note - 69) / 12);
-                            const lOsc = audioCtx.createOscillator();
-                            const lG = audioCtx.createGain();
-                            lOsc.type = 'triangle';
-                            lOsc.frequency.setValueAtTime(lFreq, time);
-                            lG.gain.setValueAtTime(0.08, time);
-                            lG.gain.exponentialRampToValueAtTime(0.01, time + step * 1.5);
-                            lOsc.connect(lG);
-                            lG.connect(musicGain);
-                            lOsc.start(time);
-                            lOsc.stop(time + step * 2);
-                        }
-                    }
-                }
-                bar++;
-                setTimeout(playBar, step * 8 * 1000);
-            }
-            playBar();
+            const randomSid = sidList[Math.floor(Math.random() * sidList.length)];
+            const trackName = randomSid.replace('.sid', '').replace(/_/g, ' ').toUpperCase();
+            if (nowPlayingEl) nowPlayingEl.innerText = `NOW PLAYING: ${trackName}`;
+            sid.play(`sid/${randomSid}`);
+            sid.setVolume(0.32); // Lowered music volume
         }
 
-        // SFX Trigger Functions
+        // --- SFX SYSTEM (VIRTUAL SID MULTI-CHANNEL) ---
+        let sfxQueue = [];
+
+        function tickSfx() {
+            for (let i = sfxQueue.length - 1; i >= 0; i--) {
+                const effect = sfxQueue[i];
+                effect.tick();
+                if (effect.done) sfxQueue.splice(i, 1);
+            }
+        }
+
         const sfx = {
-            jump: () => playSfx(150, 'square', 0.2, 400),
-            loot1: () => playSfx(880, 'triangle', 0.1, 200),
-            loot2: () => { playSfx(880, 'triangle', 0.1); setTimeout(() => playSfx(1320, 'triangle', 0.1), 50); },
-            loot3: () => { playSfx(1320, 'square', 0.1); setTimeout(() => playSfx(1760, 'square', 0.1), 50); setTimeout(() => playSfx(2640, 'square', 0.1), 100); },
-            hook: () => playSfx(400, 'sawtooth', 0.1, -200, 0.5),
-            death: () => playSfx(300, 'sawtooth', 1.5, -280, 0.8),
-            win: () => { [60, 64, 67, 72].forEach((n, i) => setTimeout(() => playSfx(440 * Math.pow(2, (n - 69) / 12), 'triangle', 0.4), i * 150)); }
+            jump: () => {
+                // TRIANGLE ASCENDING SWEEP (Voice 3)
+                let frame = 0;
+                let freq = 0x1800; 
+                sidPoke(0x12, 0x11); // Triangle + Gate
+                sidPoke(0x13, 0x00); sidPoke(0x14, 0x82); // ADSR: 0 Attack, Moderate Decay
+                sfxQueue.push({
+                    done: false,
+                    tick: function() {
+                        frame++;
+                        freq = Math.floor(freq * 1.3); // Sharp ascent
+                        if (freq > 0xD000) freq = 0xD000;
+                        sidPoke(0x0E, freq & 0xFF);
+                        sidPoke(0x0F, (freq >> 8) & 0xFF);
+                        if (frame >= 12) {
+                            sidPoke(0x12, 0x10); // Gate OFF
+                            this.done = true;
+                        }
+                    }
+                });
+            },
+            hook: () => {
+                // TWO-PART WINCH (Voice 3)
+                let frame = 0;
+                sidPoke(0x12, 0x81); // Part 1: Noise burst
+                sidPoke(0x13, 0x00); sidPoke(0x14, 0x22); 
+                sfxQueue.push({
+                    done: false,
+                    tick: function() {
+                        frame++;
+                        if (frame === 3) {
+                            sidPoke(0x12, 0x41); // Part 2: Pulse
+                            sidPoke(0x13, 0x00); sidPoke(0x14, 0x44);
+                        }
+                        if (frame > 3) {
+                            // High-freq Vibrato + PWM Tension
+                            const vib = Math.sin(frame * 1.2) * 600;
+                            const modFreq = 0x3000 + vib;
+                            sidPoke(0x0E, modFreq & 0xFF); sidPoke(0x0F, (modFreq >> 8) & 0xFF);
+                            const pw = 0x0400 + (Math.sin(frame * 0.8) * 0x0200);
+                            sidPoke(0x10, pw & 0xFF); sidPoke(0x11, (pw >> 8) & 0x0F);
+                        }
+                        if (frame >= 25) {
+                            sidPoke(0x12, 0x40);
+                            this.done = true;
+                        }
+                    }
+                });
+            },
+            loot1: () => {
+                // Basic blip (Voice 1)
+                sidPoke(0x00, 0x00); sidPoke(0x01, 0x35); // Mid-range static
+                sidPoke(0x04, 0x41); // Pulse
+                sidPoke(0x02, 0x00); sidPoke(0x03, 0x08); // Fixed 50% PW
+                sidPoke(0x05, 0x00); sidPoke(0x06, 0x20); // Fast decay
+                setTimeout(() => sidPoke(0x04, 0x40), 50);
+            },
+            loot2: () => {
+                // Ascending perfect fifth (Voice 1)
+                const sequence = [0x35, 0x4F]; 
+                sequence.forEach((f, i) => {
+                    setTimeout(() => {
+                        sidPoke(0x01, f);
+                        sidPoke(0x04, 0x41);
+                        sidPoke(0x05, 0x00); sidPoke(0x06, 0x40);
+                        setTimeout(() => sidPoke(0x04, 0x40), 60);
+                    }, i * 80);
+                });
+            },
+            loot3: () => {
+                // Major arpeggio + PWM (Voice 1)
+                let frame = 0;
+                const arpeggio = [0x35, 0x42, 0x4F]; 
+                sidPoke(0x04, 0x41);
+                sidPoke(0x05, 0x00); sidPoke(0x06, 0xA0); // Longer sustain
+                sfxQueue.push({
+                    done: false,
+                    tick: function() {
+                        frame++;
+                        const noteIdx = Math.min(2, Math.floor(frame / 5));
+                        sidPoke(0x01, arpeggio[noteIdx]);
+                        // PWM Shimmer
+                        const pw = 0x0600 + (Math.sin(frame * 0.4) * 0x0300);
+                        sidPoke(0x02, pw & 0xFF); sidPoke(0x03, (pw >> 8) & 0x0F);
+                        if (frame >= 30) {
+                            sidPoke(0x04, 0x40);
+                            this.done = true;
+                        }
+                    }
+                });
+            },
+            death: () => {
+                // Exponential Dive (Voice 1 Sawtooth + Voice 2 Noise)
+                let frame = 0;
+                let freq = 0x4000;
+                sidPoke(0x04, 0x21); // Saw (V1)
+                sidPoke(0x0B, 0x81); // Noise (V2)
+                sidPoke(0x05, 0x00); sidPoke(0x06, 0xCF); // Slow decay
+                sfxQueue.push({
+                    done: false,
+                    tick: function() {
+                        frame++;
+                        freq = Math.floor(freq * 0.92); // Dive
+                        sidPoke(0x00, freq & 0xFF);
+                        sidPoke(0x01, (freq >> 8) & 0xFF);
+                        sidPoke(0x07, freq & 0xFF); sidPoke(0x08, (freq >> 8) & 0xFF);
+                        if (frame >= 45) {
+                            sidPoke(0x04, 0x20); sidPoke(0x0B, 0x80);
+                            this.done = true;
+                        }
+                    }
+                });
+            },
+            win: () => {
+                // Triumphant Resolution (V1 Bass Triangle, V2 Pulse Melody)
+                let frame = 0;
+                const bass = [0x15, 0x1A, 0x20, 0x25];
+                const melody = [0x25, 0x30, 0x38, 0x45];
+                sidPoke(0x05, 0x00); sidPoke(0x06, 0xF0); // Solid envelopes
+                sidPoke(0x0C, 0x00); sidPoke(0x0D, 0xF0);
+                sfxQueue.push({
+                    done: false,
+                    tick: function() {
+                        frame++;
+                        const step = Math.min(3, Math.floor(frame / 10));
+                        sidPoke(0x01, bass[step]);
+                        sidPoke(0x04, 0x11); // Triangle
+                        sidPoke(0x08, melody[step]);
+                        sidPoke(0x0B, 0x41); // Pulse
+                        if (frame >= 60) {
+                            sidPoke(0x04, 0x10); sidPoke(0x0B, 0x40);
+                            this.done = true;
+                        }
+                    }
+                });
+            },
+            fail: () => { sidPoke(0x0F, 0x08); sidPoke(0x12, 0x21); sidPoke(0x13, 0x00); sidPoke(0x14, 0x44); setTimeout(() => sidPoke(0x12, 0x20), 100); }
         };
 
         // --- GAME LOGIC ---
@@ -257,6 +519,7 @@
         let lastTime = 0;
         let enteringScore = false;
         let showLeaderboard = true;
+        let isRetiring = false;
         let currentInitials = ['A', 'A', 'A'];
         let charIndex = 0;
         const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?#";
@@ -264,7 +527,7 @@
         const GRAVITY = 0.52;
         let JUMP_POWER = -12.5;
         const AIR_FRICTION = 0.992;
-        const GROUND_FRICTION = 0.84;
+        const GROUND_FRICTION = 0.92; // Relaxed from 0.84 for smoother landings
         const SWING_BOOST = 0.55;
         let HOOK_MAX_LENGTH = 300;
         const HOOK_REEL_SPEED = 1.5;
@@ -275,20 +538,6 @@
         let nearMissTimer = 0;
         let difficultyWave = 0;
         let safeZoneCounter = 0;
-
-        const player = {
-            x: 150, y: 250, w: 24, h: 44,
-            vx: 0, vy: 0,
-            isGrounded: false,
-            isDucking: false,
-            hook: { active: false, x: 0, y: 0, length: 0, anchorPlatform: null }
-        };
-
-        let bgLayers = [
-            { speed: 0.1, elements: [] },
-            { speed: 0.3, elements: [] },
-            { speed: 0.6, elements: [] }
-        ];
 
         let platforms = [];
         let items = [];
@@ -352,6 +601,23 @@
         }
 
         function initLevel() {
+            const deploymentFee = Math.floor(500 + (bank * 0.1));
+            // Grace: Allow spawn if bank is 0 and no augments exist
+            const isFreshStart = bank === 0 && augments.tether === 0 && augments.kinetic === 0 && augments.uplink === 0;
+
+            if (bank < deploymentFee && !isFreshStart) {
+                sfx.fail();
+                isBankrupt = true;
+                shopOverlay.style.display = "none";
+                showMsg("<span style='color:" + C64.LIGHT_RED + ";'>*** GAME OVER ***</span><br><br>BANKRUPTCY DETECTED.<br>UPLINK TERMINATED.<br><br>PRESS [R] TO RESTART SYSTEM<br>█");
+                return;
+            }
+            
+            if (!isFreshStart) {
+                bank -= deploymentFee;
+            }
+            saveGame();
+
             initAudio();
             applyAugments();
             platforms = [{ x: 0, y: 450, w: 1200, h: 50 }];
@@ -447,6 +713,7 @@
 
         function update(dt) {
             const scalar = dt / 16.66;
+            tickSfx(); // Handle SID sweeps
             bgLayers.forEach(l => l.elements.forEach(e => {
                 e.x -= scrollSpeed * l.speed * scalar;
                 if (e.x + e.w < 0) e.x = canvas.width + Math.random() * 100;
@@ -511,10 +778,12 @@
             if (!player.hook.active) {
                 player.vx *= Math.pow(player.isGrounded ? GROUND_FRICTION : AIR_FRICTION, scalar);
             }
-            // Soft auto-centering — only when grounded, idle, and far from center
+            // Soft auto-centering — gentler spring with damping to prevent backward sliding
             const driftFromCenter = 150 - player.x;
             if (!player.hook.active && player.isGrounded && !keys['ArrowRight'] && !keys['KeyD'] && !keys['ArrowLeft'] && !keys['KeyA'] && Math.abs(driftFromCenter) > 40) {
-                player.vx += driftFromCenter * 0.003 * scalar;
+                const springForce = driftFromCenter * 0.0008; // Reduced from 0.003
+                const dampingForce = player.vx * 0.06;
+                player.vx += (springForce - dampingForce) * scalar;
             }
             player.x += player.vx * scalar; player.y += player.vy * scalar;
             if (nearMissTimer > 0) nearMissTimer -= dt;
@@ -557,65 +826,199 @@
             obstacles = obstacles.filter(o => o.x + o.w > -100);
         }
 
+        // --- C64 COLORS ---
+        const C64 = {
+            BLACK: "#000000", WHITE: "#FFFFFF", RED: "#880000", CYAN: "#AAFFEE",
+            PURPLE: "#CC44CC", GREEN: "#00CC55", BLUE: "#0000AA", YELLOW: "#EEEE77",
+            ORANGE: "#DD8855", BROWN: "#664400", LIGHT_RED: "#FF7777", DARK_GREY: "#333333",
+            GREY: "#777777", LIGHT_GREEN: "#AAFF66", LIGHT_BLUE: "#0088FF", LIGHT_GREY: "#BBBBBB"
+        };
+
+        const player = {
+            x: 150, y: 250, w: 32, h: 48, // Slightly wider for blocky feel
+            vx: 0, vy: 0,
+            isGrounded: false,
+            isDucking: false,
+            frame: 0,
+            hook: { active: false, x: 0, y: 0, length: 0, anchorPlatform: null }
+        };
+
+        let bgLayers = [
+            { speed: 0.05, elements: [], color: C64.DARK_GREY },
+            { speed: 0.15, elements: [], color: C64.GREY },
+            { speed: 0.4, elements: [], color: C64.LIGHT_BLUE }
+        ];
+
+        function drawPlayer(x, y, w, h, ducking, grounded) {
+            const bodyColor = nearMissTimer > 0 ? C64.WHITE : C64.YELLOW;
+            const accentColor = C64.ORANGE;
+            
+            ctx.fillStyle = C64.BLACK; // Shadow
+            ctx.fillRect(x + 4, y + 4, w, h);
+
+            ctx.fillStyle = bodyColor;
+            ctx.fillRect(x, y, w, h);
+
+            // "Visor" or eyes
+            ctx.fillStyle = C64.BLACK;
+            const eyeX = player.vx >= 0 ? x + 20 : x + 4;
+            ctx.fillRect(eyeX, y + 8, 8, 8);
+            ctx.fillStyle = C64.CYAN;
+            ctx.fillRect(eyeX + 2, y + 10, 4, 4);
+
+            // Detailing
+            ctx.fillStyle = accentColor;
+            ctx.fillRect(x, y + h - 8, w, 8); // Boots
+            
+            if (!grounded) {
+                // "Thruster" or jump visual
+                ctx.fillStyle = C64.WHITE;
+                ctx.fillRect(x + w/4, y + h, w/2, 4);
+            }
+        }
+
         function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Background - Classic C64 screen color
+            ctx.fillStyle = C64.BLUE;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Parallax Background
             bgLayers.forEach((l, i) => {
-                ctx.fillStyle = i === 0 ? "#0c0a00" : (i === 1 ? "#151200" : "#1f1a00");
-                l.elements.forEach(e => ctx.fillRect(e.x, e.y, e.w, e.h));
+                ctx.fillStyle = l.color;
+                l.elements.forEach(e => {
+                    if (i === 0) {
+                        // Distant "stars" or data bits
+                        ctx.fillRect(e.x, e.y, 4, 4);
+                    } else {
+                        // Blocky "buildings" or circuit blocks
+                        ctx.fillRect(e.x, e.y, e.w, e.h);
+                        ctx.fillStyle = C64.BLACK;
+                        ctx.fillRect(e.x + 4, e.y + 4, e.w - 8, 4); // "Windows" or traces
+                        ctx.fillStyle = l.color;
+                    }
+                });
             });
-            ctx.fillStyle = "rgba(255, 176, 0, 0.05)";
-            for(let i=0; i<canvas.height; i+=4) ctx.fillRect(0, i, canvas.width, 2);
+
             if (gameActive) {
-                ctx.fillStyle = "#332800"; platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+                // Platforms
+                platforms.forEach(p => {
+                    ctx.fillStyle = C64.BROWN;
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    ctx.fillStyle = C64.BLACK;
+                    ctx.fillRect(p.x, p.y, p.w, 4); // Top edge line
+                    // Side shading
+                    ctx.fillStyle = "rgba(0,0,0,0.3)";
+                    ctx.fillRect(p.x, p.y + 4, 8, p.h);
+                });
+
+                // Obstacles - Spiky or hazard blocks
                 obstacles.forEach(o => {
-                    ctx.fillStyle = "#ff5500"; ctx.fillRect(o.x, o.y, o.w, o.h);
-                    ctx.strokeStyle = "#ffb000"; ctx.lineWidth = 2; ctx.strokeRect(o.x+4, o.y+4, o.w-8, o.h-8);
-                    if (frameCount % 20 < 10) { ctx.fillStyle = "#fff"; ctx.fillRect(o.x + o.w/2 - 2, o.y + o.h/2 - 2, 4, 4); }
+                    ctx.fillStyle = C64.RED;
+                    ctx.fillRect(o.x, o.y, o.w, o.h);
+                    ctx.fillStyle = C64.LIGHT_RED;
+                    ctx.fillRect(o.x + 4, o.y + 4, o.w - 8, o.h - 8);
+                    
+                    // Animated hazard cross
+                    if (frameCount % 30 < 15) {
+                        ctx.fillStyle = C64.WHITE;
+                        ctx.fillRect(o.x + o.w/2 - 2, o.y + 2, 4, o.h - 4);
+                        ctx.fillRect(o.x + 2, o.y + o.h/2 - 2, o.w - 4, 4);
+                    }
                 });
+
+                // Items - Floating data pods
                 items.forEach(i => {
-                    ctx.fillStyle = i.tier === 2 ? "#00d4ff" : (i.tier === 3 ? "#ff00ff" : "#ffb000");
-                    ctx.beginPath(); ctx.arc(i.x + i.w/2, i.y + i.h/2, i.w/2, 0, Math.PI*2); ctx.fill();
-                    ctx.fillStyle = "#fff"; ctx.fillRect(i.x + i.w/4, i.y + i.h/4, i.w/4, i.h/4);
+                    const colors = [C64.WHITE, C64.CYAN, C64.PURPLE];
+                    const color = i.tier === 2 ? C64.CYAN : (i.tier === 3 ? C64.PURPLE : C64.YELLOW);
+                    
+                    ctx.fillStyle = C64.BLACK;
+                    ctx.fillRect(i.x + 2, i.y + 2, i.w, i.h);
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(i.x, i.y, i.w, i.h);
+                    
+                    // Inner "glint"
+                    ctx.fillStyle = C64.WHITE;
+                    ctx.fillRect(i.x + 2, i.y + 2, 4, 4);
                 });
+
+                // Hook/Tether
                 if (player.hook.active) {
-                    ctx.strokeStyle = "#ffb000"; ctx.lineWidth = 1; ctx.setLineDash([8, 4]);
-                    ctx.beginPath(); ctx.moveTo(player.x + player.w / 2, player.y + 10); ctx.lineTo(player.hook.x, player.hook.y); ctx.stroke();
-                    ctx.setLineDash([]); ctx.fillStyle = "#fff"; ctx.fillRect(player.hook.x-5, player.hook.y-5, 10, 10);
+                    ctx.strokeStyle = C64.WHITE;
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(player.x + player.w / 2, player.y + 16);
+                    ctx.lineTo(player.hook.x, player.hook.y);
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = C64.LIGHT_BLUE;
+                    ctx.fillRect(player.hook.x - 8, player.hook.y - 4, 16, 8);
                 }
-                ctx.fillStyle = nearMissTimer > 0 ? "#ffffff" : (player.isDucking ? "#886000" : "#ffb000");
-                let dH = player.isDucking ? player.h / 2 : player.h, dY = player.isDucking ? player.y + player.h / 2 : player.y;
-                ctx.fillRect(player.x, dY, player.w, dH);
-                ctx.fillStyle = "#fff"; ctx.fillRect(player.x + (player.vx > 0 ? 16 : 4), dY + 6, 5, 5);
+
+                // Player
+                let dH = player.isDucking ? player.h / 2 : player.h;
+                let dY = player.isDucking ? player.y + player.h / 2 : player.y;
+                drawPlayer(player.x, dY, player.w, dH, player.isDucking, player.isGrounded);
+
                 // Near-miss flash
                 if (nearMissTimer > 0) {
-                    ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.fillStyle = "#fff"; ctx.font = "8px 'Press Start 2P'"; ctx.textAlign = "center";
-                    ctx.fillText("CLOSE CALL +$100", player.x + player.w / 2, dY - 10);
+                    ctx.fillStyle = "rgba(255,255,255,0.2)";
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = C64.WHITE;
+                    ctx.font = "12px 'Press Start 2P'";
+                    ctx.textAlign = "center";
+                    ctx.fillText("CRITICAL DODGE!", player.x + player.w / 2, dY - 20);
                 }
             }
+
+            // Leaderboard & Overlays
             if (showLeaderboard && !enteringScore && shopOverlay.style.display !== "block") {
-                ctx.fillStyle = "rgba(5, 4, 0, 0.9)"; ctx.fillRect(250, 60, 500, 380);
-                ctx.strokeStyle = "#ffb000"; ctx.lineWidth = 4; ctx.strokeRect(250, 60, 500, 380);
-                ctx.fillStyle = "#ffb000"; ctx.font = "16px 'Press Start 2P'"; ctx.textAlign = "center";
-                ctx.fillText("GLOBAL ELITE", 500, 110);
-                ctx.font = "10px 'Press Start 2P'";
+                ctx.fillStyle = "rgba(0, 0, 170, 0.95)"; // C64 Blue
+                ctx.fillRect(200, 40, 600, 420);
+                ctx.strokeStyle = C64.LIGHT_BLUE;
+                ctx.lineWidth = 8;
+                ctx.strokeRect(200, 40, 600, 420);
+                
+                ctx.fillStyle = C64.WHITE;
+                ctx.font = "20px 'Press Start 2P'";
+                ctx.textAlign = "center";
+                ctx.fillText("COMMODORE ELITE", 500, 100);
+                
+                ctx.font = "12px 'Press Start 2P'";
                 if (leaderboardStatus === "LOADING") ctx.fillText("CONNECTING...", 500, 240);
                 else if (leaderboardStatus === "ERROR") {
-                    ctx.fillStyle = "#ff5500"; ctx.fillText("DB ACCESS ERROR", 500, 220);
-                    ctx.font = "7px 'Press Start 2P'"; ctx.fillText(lastError.toUpperCase().substring(0, 40), 500, 260);
-                } else if (leaderboardStatus === "EMPTY") ctx.fillText("NO DATA LOGGED", 500, 240);
+                    ctx.fillStyle = C64.RED;
+                    ctx.fillText("IO ERROR", 500, 220);
+                } else if (leaderboardStatus === "EMPTY") ctx.fillText("NO RECORDS FOUND", 500, 240);
                 else {
                     highScores.forEach((s, i) => {
-                        ctx.textAlign = "left"; ctx.fillText(`${(i+1).toString().padStart(2, '0')} ${s.name}`, 300, 160 + i * 26);
-                        ctx.textAlign = "right"; ctx.fillText(`$${formatScore(s.score)}`, 700, 160 + i * 26);
+                        ctx.textAlign = "left";
+                        ctx.fillStyle = i === 0 ? C64.YELLOW : C64.WHITE;
+                        ctx.fillText(`${(i+1).toString().padStart(2, '0')} ${s.name}`, 260, 160 + i * 28);
+                        ctx.textAlign = "right";
+                        ctx.fillText(`$${formatScore(s.score)}`, 740, 160 + i * 28);
                     });
                 }
-                if (!gameActive) { ctx.textAlign = "center"; ctx.fillStyle = "#fff5e0"; ctx.fillText("PRESS [R] FOR SHOP", 500, 410); }
+                if (!gameActive) {
+                    ctx.textAlign = "center";
+                    ctx.fillStyle = C64.LIGHT_GREEN;
+                    ctx.fillText("PRESS [R] FOR RE-DROP", 500, 430);
+                }
             }
         }
 
         function loop(time) { const dt = Math.min(time - lastTime, 50); lastTime = time; update(dt); draw(); animationFrameId = requestAnimationFrame(loop); }
-        function gameOver() { if (!gameActive) return; gameActive = false; sfx.death(); checkHighScore(); if (!enteringScore) { showMsg("<span style='color:#ff5500; font-size: 16px;'>SYSTEM FAILURE</span><br><br>Buffer purged. Data lost.<br><br>[R] TO REBOOT"); showLeaderboard = true; fetchScores(); } }
+        function gameOver() { 
+            if (!gameActive) return; 
+            gameActive = false; 
+            sfx.death(); 
+            checkHighScore(); 
+            if (!enteringScore) { 
+                showMsg("<span style='color:" + C64.LIGHT_RED + ";'>*** FATAL ERROR ***</span><br><br>BUFFER OVERFLOW AT $D012<br>PARITY CHECK FAILED.<br><br>READY.<br>█"); 
+                showLeaderboard = true; 
+                fetchScores(); 
+            } 
+        }
         
         function extract() { 
             if (wallet >= EXTRACT_THRESHOLD && gameActive) { 
@@ -625,16 +1028,23 @@
                 let f = wallet; wallet = 0; sfx.win(); updateUI(); gameActive = false; 
                 checkHighScore(f); 
                 if (!enteringScore) { 
-                    showMsg("<span style='color:#ffb000; font-size: 16px;'>UPLINK COMPLETE</span><br><br>Security fee: $" + fee + ".<br><br>[R] FOR SHOP"); 
+                    showMsg("<span style='color:" + C64.LIGHT_GREEN + ";'>LOAD \"*\",8,1</span><br><br>SEARCHING FOR UPLINK...<br>FOUND DATA BUFFER<br>LOADING...<br><br>READY.<br>█"); 
                     showLeaderboard = true; fetchScores(); 
                 } 
             } 
         }
 
+        // Add a C64-style boot message on startup
+        window.addEventListener('load', () => {
+            showMsg("<span style='color:" + C64.WHITE + ";'>**** COMMODORE 64 BASIC V2 ****</span><br><br> 64K RAM SYSTEM  38911 BASIC BYTES FREE<br><br>READY.<br>█");
+            showLeaderboard = true;
+        });
+
         let pendingScore = 0;
-        function checkHighScore(s = wallet) { 
+        function checkHighScore(s = wallet, forced = false) { 
             pendingScore = s; 
-            const isHighScore = s > 0 && (leaderboardStatus !== "READY" || highScores.length < 10 || s > highScores[highScores.length - 1]?.score);
+            isRetiring = forced;
+            const isHighScore = forced || (s > 0 && (leaderboardStatus !== "READY" || highScores.length < 10 || s > highScores[highScores.length - 1]?.score));
             if (isHighScore) { 
                 enteringScore = true; 
                 initialsOverlay.style.display = "block"; 
@@ -647,10 +1057,19 @@
             const n = currentInitials.join(''); 
             const success = await submitScore(n, pendingScore); 
             if (success) {
+                if (isRetiring) {
+                    bank = 0;
+                    augments = { tether: 0, kinetic: 0, uplink: 0 };
+                    localStorage.setItem('exoborn_archive', 0);
+                    localStorage.setItem('exoborn_augments', JSON.stringify(augments));
+                    applyAugments(); // Reset physical unit stats immediately
+                    updateUI();
+                }
                 enteringScore = false; 
+                isRetiring = false;
                 initialsOverlay.style.display = "none"; 
                 showLeaderboard = true; 
-                showMsg("<span style='color:#ffb000;'>DATA ARCHIVED</span><br><br>Operative " + n + " logged.<br><br>[R] FOR SHOP"); 
+                showMsg("<span style='color:#ffb000;'>RECORD FINALIZED</span><br><br>Operative " + n + " retired.<br><br>[R] FOR NEW DROP"); 
             } else {
                 showMsg("<span style='color:#ff5500;'>ARCHIVE FAILED</span><br><br>System link lost.<br><br>[SPACE] TO RETRY");
             }
@@ -685,7 +1104,11 @@
             if ((e.code === 'ArrowDown' || e.code === 'KeyS') && gameActive && !player.hook.active) player.isDucking = true;
             if (e.code === 'KeyE') extract();
             if (e.code === 'KeyR' && !enteringScore) {
-                if (!gameActive) toggleShop();
+                if (isBankrupt) {
+                    fullReset();
+                } else if (!gameActive) {
+                    toggleShop();
+                }
             }
         });
         window.addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'ArrowDown' || e.code === 'KeyS') player.isDucking = false; if ((e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') && player.vy < -5) player.vy *= 0.5; });
